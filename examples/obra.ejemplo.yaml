@@ -1,0 +1,91 @@
+# Ejemplo de importación de una obra en el registro SQLite.
+#
+#   onirifix registro importar examples/obra.ejemplo.yaml
+#   onirifix --obra oniriums analizar examples/manuscrito_ejemplo.md
+#
+# El slug identifica la obra en la base de datos. Los personajes, lugares y
+# términos alimentan las reglas de consistencia. Las `variantes` son formas que
+# la regla CON-001 debe señalar como error; si una variante es legítima, usa
+# `alias` en personajes/lugares en lugar de `variantes`.
+
+obra:
+  slug: oniriums
+  titulo: Oniriums
+  autor: Feith Noir
+  idioma: es
+  genero: fantasía
+  descripcion: Obra de ejemplo basada en el universo de Oniriums.
+
+personajes:
+  - nombre: Feith Noir
+    rol: protagonista
+    alias:
+      - Feith
+    descripcion: Portadora del Velo.
+  - nombre: Mico
+    rol: secundario
+    descripcion: Compañero de viaje. Su nombre también es una palabra común.
+  - nombre: Vespera
+    rol: antagonista
+  - nombre: Ralex
+    rol: secundario
+  - nombre: Elara
+    rol: secundario
+  - nombre: Kaar'Tcha
+    rol: secundario
+    alias:
+      - Kaar Tcha
+  - nombre: Cocoa de M'dir
+    rol: secundario
+
+lugares:
+  - nombre: Villa Gris
+    tipo: ciudad
+  - nombre: Campos Dorados
+    tipo: región
+  - nombre: M'dir
+    tipo: ciudad
+  - nombre: Bosque de Ceniza
+    tipo: bosque
+
+terminos:
+  - termino: Oniriums
+    tipo: glosario
+    definicion: Nombre del mundo onírico.
+    sensible: true
+    variantes:
+      - Onirium
+      - Oniriums'
+  - termino: onirio
+    tipo: glosario
+    definicion: Habitante o materia del mundo onírico.
+  - termino: jerinca
+    tipo: glosario
+    definicion: Unidad de medida del universo.
+  - termino: Mochi
+    tipo: glosario
+    definicion: Criatura recurrente.
+  - termino: azotador
+    tipo: glosario
+  - termino: Placas Maestras
+    tipo: glosario
+    sensible: true
+  - termino: Velo
+    tipo: glosario
+    sensible: true
+  # Los nombres propios también pueden vivir en el glosario para declarar
+  # variantes incorrectas que CON-001 debe unificar.
+  - termino: Kaar'Tcha
+    tipo: nombre
+    variantes:
+      - KaarTcha
+      - Kaar-tcha
+  - termino: Cocoa de M'dir
+    tipo: nombre
+    variantes:
+      - Cocoa de Mdir
+      - Cocoa de M' dir
+
+verbos_habla:
+  - trinó
+  - silbó

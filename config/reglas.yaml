@@ -1,0 +1,289 @@
+# ---------------------------------------------------------------------------
+# OniriFix · configuración de reglas
+# ---------------------------------------------------------------------------
+# Este archivo se puede editar sin tocar código. Los valores que no aparezcan
+# aquí se toman de los defaults internos de `onirifix.config`.
+#
+# Precedencia: defaults < este YAML < variables de entorno < opciones CLI.
+# ---------------------------------------------------------------------------
+
+version: 1
+idioma: es
+
+# Umbral mínimo de confianza para aplicar hallazgos L2.
+umbral_l2: 0.90
+
+# Copia de seguridad antes de modificar un archivo y auditoría en SQLite.
+backup: true
+auditoria: true
+
+# Límites de los informes para que un manuscrito enorme no genere un Markdown
+# imposible de leer. El CSV y el JSON conservan todos los hallazgos.
+informes:
+  max_por_regla: 300
+  incluir_contexto: true
+
+# ---------------------------------------------------------------------------
+# Interruptores por regla
+# ---------------------------------------------------------------------------
+# false desactiva la regla; true la activa. DIA-003 es L1 pero opt-in: la RAE
+# estricta cambia la puntuación de diálogo y no debe ser el comportamiento por
+# defecto de una herramienta que promete no tocar la voz del autor.
+reglas:
+  TIP-001: true
+  TIP-002: true
+  TIP-003: true
+  TIP-004: true
+  TIP-005: true
+  TIP-006: true
+  TIP-007: true
+  TIP-008: true
+  TIP-009: true
+  TIP-010: false
+  DIA-001: true
+  DIA-002: true
+  DIA-003: false
+  DIA-004: true
+  DIA-005: true
+  TIL-001: true
+  TIL-002: true
+  HOM-001: true
+  HOM-002: true
+  ORT-001: true
+  ORT-002: true
+  ORT-003: true
+  CON-001: true
+  CON-002: true
+  REP-001: true
+  REP-002: true
+  REP-003: true
+  REP-004: true
+
+# ---------------------------------------------------------------------------
+# Tipografía mecánica (L1)
+# ---------------------------------------------------------------------------
+tipografia:
+  # Par de comillas tipográficas para español. Para estilo anglosajón: “”
+  comillas: «»
+  convertir_comillas: true
+  convertir_apostrofos: true
+  puntos_suspensivos: true
+  rayas: true
+  espacios: true
+  puntuacion: true
+  guion_dialogo: true
+  # Normaliza los finales de línea a \n al leer y al escribir.
+  normalizar_saltos: true
+
+# ---------------------------------------------------------------------------
+# Diálogos
+# ---------------------------------------------------------------------------
+dialogos:
+  # DIA-003: «—Basta. —dijo» → «—Basta —dijo». Apagado por defecto.
+  rae_estricto: false
+  # Verbos de habla adicionales de esta obra (además de los del registro).
+  verbos_extra: []
+
+# ---------------------------------------------------------------------------
+# Tildes contextuales (L2)
+# ---------------------------------------------------------------------------
+tildes:
+  hacia: true
+  futuros_truncados: true
+  # El voseo («mirá esto») es válido. Si tu obra lo usa, activa esta opción
+  # para que TIL-002 no proponga futuros donde no toca.
+  permitir_voseo: false
+  # Palabras terminadas en á que la regla debe ignorar siempre.
+  palabras_validas_extra: []
+
+# ---------------------------------------------------------------------------
+# Ortografía
+# ---------------------------------------------------------------------------
+ortografia:
+  # Ruta a un diccionario Hunspell sin extensión (ej. es_ES) o a una carpeta
+  # que contenga es_ES.aff / es_ES.dic. Requiere el extra [ortografia].
+  diccionario: null
+  # Alternativa ligera: archivo de texto con una palabra por línea.
+  lista_palabras: null
+  usar_diccionario: true
+  # Correcciones explícitas para abreviaturas o errores recurrentes. Se
+  # aplican como L2 y respetan mayúsculas/minúsculas del original.
+  correcciones:
+    "q": "que"
+    "xq": "porque"
+    "pq": "porque"
+    "tmb": "también"
+    "d": "de"
+  palabras_ignoradas: []
+
+# ---------------------------------------------------------------------------
+# Consistencia onomástica (L2)
+# ---------------------------------------------------------------------------
+consistencia:
+  # Porcentaje de similitud para variantes difusas. Las variantes explícitas
+  # del registro siempre se detectan de forma exacta.
+  similitud_minima: 92
+  incluir_personajes: true
+  incluir_lugares: true
+  incluir_terminos: true
+
+# ---------------------------------------------------------------------------
+# Repetición léxica (L3)
+# ---------------------------------------------------------------------------
+repeticion:
+  top: 50
+  minimo_palabras: 8
+  min_longitud: 4
+  incluir_glosario: false
+  # Añade el desglose por capítulo a cada hallazgo de frecuencia.
+  por_capitulo: true
+  # Avisa de frases con más de N palabras.
+  longitud_frase: 60
+  stopwords:
+    - a
+    - al
+    - algo
+    - algunas
+    - algunos
+    - ante
+    - antes
+    - aqui
+    - así
+    - aun
+    - aunque
+    - bajo
+    - bien
+    - cada
+    - casi
+    - como
+    - con
+    - contra
+    - cual
+    - cuando
+    - de
+    - del
+    - desde
+    - donde
+    - dos
+    - el
+    - ella
+    - ellas
+    - ellos
+    - en
+    - entre
+    - era
+    - eran
+    - eres
+    - es
+    - esa
+    - esas
+    - ese
+    - eso
+    - esos
+    - esta
+    - estaba
+    - estaban
+    - estado
+    - estas
+    - este
+    - esto
+    - estos
+    - fue
+    - fueron
+    - ha
+    - había
+    - habían
+    - han
+    - hasta
+    - hay
+    - la
+    - las
+    - le
+    - les
+    - lo
+    - los
+    - más
+    - me
+    - mi
+    - mientras
+    - muy
+    - nada
+    - ni
+    - no
+    - nos
+    - nosotros
+    - o
+    - os
+    - otra
+    - otras
+    - otro
+    - otros
+    - para
+    - pero
+    - poco
+    - por
+    - porque
+    - que
+    - quien
+    - se
+    - sea
+    - ser
+    - si
+    - sin
+    - sobre
+    - solo
+    - son
+    - su
+    - sus
+    - también
+    - tan
+    - tanto
+    - te
+    - tener
+    - tiene
+    - todo
+    - todos
+    - tu
+    - tus
+    - un
+    - una
+    - unas
+    - uno
+    - unos
+    - y
+    - ya
+    - yo
+
+# ---------------------------------------------------------------------------
+# Duplicados (L3)
+# ---------------------------------------------------------------------------
+duplicados:
+  minimo_palabras: 8
+  similitud: 92
+  # Protección de rendimiento: a partir de este número de párrafos solo se
+  # comparan bloques con una longitud parecida.
+  maximo_parrafos: 2000
+
+# ---------------------------------------------------------------------------
+# Residuo de IA (L3, solo informe)
+# ---------------------------------------------------------------------------
+residuo_ia:
+  frases:
+    - en el vasto tapiz
+    - un testimonio de
+    - no solo
+    - en resumen
+    - es importante destacar
+    - en conclusión
+    - como si el tiempo se detuviera
+    - un torbellino de emociones
+    - en la encrucijada de
+    - una sinfonía de
+    - el eco de
+    - una danza de
+    - en el corazón de
+    - un recordatorio de que
+    - un viaje de autodescubrimiento
+    - con cada fibra de su ser
+    - el peso de
+    - la esencia misma de
