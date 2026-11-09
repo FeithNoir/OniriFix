@@ -18,7 +18,7 @@ from onirifix.nucleo.motor import Motor
 TEXTO = (
     "# Capítulo 1\n\n"
     "—Basta. —Dijo Lina.\n\n"
-    "Tomás se inclinó hacía adelante...\n\n"
+    "Tomás dio dos pasos hacía adelante...\n\n"
     "# Capítulo 2\n\n"
     "Vienes mañana?\n\n"
     "La la tarde caía sobre el puerto.\n"

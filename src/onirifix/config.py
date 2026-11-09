@@ -109,6 +109,8 @@ DEFAULTS: dict[str, Any] = {
             "pq": "porque",
             "tmb": "también",
             "d": "de",
+            # «aun así» (= incluso así) nunca lleva tilde.
+            "aún así": "aun así",
         },
         "palabras_ignoradas": [],
     },

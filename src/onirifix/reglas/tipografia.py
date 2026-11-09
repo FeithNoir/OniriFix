@@ -187,7 +187,7 @@ class RayasDeDialogo:
     _inicio_doble_guion = re.compile(r"(?m)^(?P<indent>[ \t]*)--[ \t]*(?!-)(?=\S)")
     _inciso_en_dash = re.compile(r"(?<=\S)[ \t]–[ \t]*(?=\S)")
     _inciso_doble_guion = re.compile(r"(?<=\s)--(?=\s)")
-    # «-Serán cinco puntos»: guion simple pegado al parlamento. Con espacio
+    # «-Ya voy»: guion simple pegado al parlamento. Con espacio
     # detrás («- item») es una lista Markdown y no se toca.
     _inicio_guion_simple = re.compile(
         r"(?m)^(?P<indent>[ \t]*)-(?=[¿¡A-ZÁÉÍÓÚÜÑa-záéíóúüñ])"
@@ -330,7 +330,7 @@ class ElipsisCorrupta:
 class SignoDeCierreInvertido:
     id = "TIP-012"
     nivel = Nivel.L1
-    descripcion = "Corrige un signo de apertura usado como cierre («¡Lo siento ¡» → «¡Lo siento!»)."
+    descripcion = "Corrige un signo de apertura usado como cierre («¡Ya voy ¡» → «¡Ya voy!»)."
     prioridad = 8
     por_defecto = True
 

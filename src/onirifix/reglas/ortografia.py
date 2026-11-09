@@ -169,7 +169,7 @@ _ABREVIATURAS = {
 class MayusculaTrasPunto:
     id = "ORT-004"
     nivel = Nivel.L2
-    descripcion = "Propone mayúscula tras punto («molesto. casi cansado» → «molesto. Casi»)."
+    descripcion = "Propone mayúscula tras punto («iba lento. casi parado» → «lento. Casi»)."
     prioridad = 34
     por_defecto = True
 

@@ -77,7 +77,7 @@ def test_tip_011_elipsis_corrupta(texto: str, esperado: str) -> None:
 
 
 def test_tip_012_cierre_invertido() -> None:
-    assert _corrige("TIP-012", "—¡Perdón, de verdad ¡") == "—¡Perdón, de verdad!"
+    assert _corrige("TIP-012", "—¡Ya voy, espérame ¡") == "—¡Ya voy, espérame!"
     assert _corrige("TIP-012", "¿Qué hora es¿") == "¿Qué hora es?"
     assert ejecutar_regla("TIP-012", "¡Hola! ¡Adiós!") == []
 
@@ -117,7 +117,7 @@ def test_tip_015_espacios_dentro_de_signos() -> None:
     "texto",
     [
         "Lina giró hacía el muelle.",
-        "Tomás se inclinó hacía adelante.",
+        "Tomás dio dos pasos hacía adelante.",
         "La mirada se le fue hacía ella.",
         "Corrió hacía allí sin pensar.",
     ],
@@ -143,9 +143,9 @@ def test_til_001_no_toca_hacia_verbo() -> None:
 @pytest.mark.parametrize(
     ("texto", "original", "sugerencia"),
     [
-        ("Lina río junto a ellos.", "río", "rió"),
+        ("Lina río a carcajadas.", "río", "rió"),
         ("Rio Tomás con ganas.", "Rio", "Rió"),
-        ("El viejo se detuvo y señalo la puerta.", "señalo", "señaló"),
+        ("La guardiana asintió y señalo la puerta.", "señalo", "señaló"),
         ("Contesto Lina sin dudar.", "Contesto", "Contestó"),
         ("—¿Vienes? —pregunto Tomás.", "pregunto", "preguntó"),
         ("Ella suspiro despacio.", "suspiro", "suspiró"),
@@ -165,7 +165,7 @@ def test_til_003_preterito_ambiguo_con_contexto(texto: str, original: str, suger
         "Cruzaron el río a nado.",
         "Yo miro el mar cada tarde.",
         "Dio el primer paso.",
-        "Soltó un leve suspiro.",
+        "Dejó escapar un suspiro.",
         "Ahora paso por tu casa.",
     ],
 )
@@ -197,9 +197,9 @@ def test_til_003_respeta_glosario() -> None:
     ("texto", "sugerencia"),
     [
         ("vivían en un barrió humilde", "barrio"),
-        ("perdieron algo de su brilló", "brillo"),
+        ("el anillo tenía un brilló opaco", "brillo"),
         ("fue un gestó mínimo", "gesto"),
-        ("soltó un leve suspiró", "suspiro"),
+        ("dejó escapar un suspiró", "suspiro"),
     ],
 )
 def test_til_004_sustantivo_tras_determinante(texto: str, sugerencia: str) -> None:
@@ -228,8 +228,8 @@ def test_til_004_el_es_ambiguo_y_tiene_baja_confianza() -> None:
         ("—Si, eso dijo.", "—Sí, eso dijo."),
         ("pues el ya lo sabía", "pues él ya lo sabía"),
         ("se acercaban a el para oírlo", "se acercaban a él para oírlo"),
-        ("—Lina, ya sabes que hacer.", "—Lina, ya sabes qué hacer."),
-        ("no sé cuanto tiempo pasó", "no sé cuánto tiempo pasó"),
+        ("—Lina, no sé que decir.", "—Lina, no sé qué decir."),
+        ("no sé cuanto cuesta el pan", "no sé cuánto cuesta el pan"),
     ],
 )
 def test_til_005_diacriticas(texto: str, esperado: str) -> None:
@@ -251,8 +251,8 @@ def test_til_005_no_toca_usos_correctos(texto: str) -> None:
     [
         ("miró a los demás como si esperará una respuesta", "esperara"),
         ("Antes de que Tomás estallará, ella habló.", "estallara"),
-        ("respiraba como si le faltará el aire", "faltara"),
-        ("bajó la voz para evitar que se escuchará", "escuchara"),
+        ("sonreía como si ocultará algo", "ocultara"),
+        ("cerró la ventana para que no entrará el frío", "entrara"),
         ("como si tendrá miedo", "tuviera"),
         ("hasta que llegarán los demás", "llegaran"),
     ],
@@ -287,10 +287,10 @@ def test_ort_003_repeticion_enfatica_baja_confianza() -> None:
 
 
 def test_ort_004_mayuscula_tras_punto() -> None:
-    texto = "Parecía molesto. casi cansado. Llegó el Sr. ramos, etc. y más."
+    texto = "El tren iba lento. casi parado. Llegó el Sr. ramos, etc. y más."
     hallazgos = ejecutar_regla("ORT-004", texto)
     assert [h.original for h in hallazgos] == ["c"]
-    assert aplicar_hallazgos(hallazgos, texto).startswith("Parecía molesto. Casi")
+    assert aplicar_hallazgos(hallazgos, texto).startswith("El tren iba lento. Casi")
 
 
 def test_rep_005_parrafo_duplicado_consecutivo() -> None:
@@ -317,16 +317,16 @@ def test_rep_005_no_toca_repeticiones_lejanas() -> None:
 
 def test_rep_006_residuos_de_asistente() -> None:
     texto = (
-        "¡Qué excelente adición! Aquí tienes la ampliación del fragmento:\n"
-        "(Contexto anterior...)\n"
+        "¡Qué buena idea! Aquí tienes una versión mejorada del relato:\n"
+        "(Contexto anterior: la feria)\n"
         "Escena ampliada (Capítulo 2)\n"
         "Todo estaba en calma. [TODO revisar]"
     )
     hallazgos = ejecutar_regla("REP-006", texto)
     originales = [h.original for h in hallazgos]
-    assert "¡Qué excelente adición" in originales
+    assert "¡Qué buena idea" in originales
     assert "Aquí tienes" in originales
-    assert "(Contexto anterior...)" in originales
+    assert "(Contexto anterior: la feria)" in originales
     assert "Escena ampliada (Capítulo 2)" in originales
     assert "Todo" not in originales  # «Todo» español no es un marcador
     assert all(h.nivel is Nivel.L3 and h.sugerencia is None for h in hallazgos)
@@ -336,3 +336,9 @@ def test_rep_006_terminos_vetados_configurables() -> None:
     config = Configuracion({"residuos_borrador": {"vetados": ["jeans"], "patrones": ["kokoro"]}})
     hallazgos = ejecutar_regla("REP-006", "Llevaba jeans y hablaba del kokoro.", config=config)
     assert {h.original for h in hallazgos} == {"jeans", "kokoro"}
+
+
+def test_ort_001_aun_asi_sin_tilde() -> None:
+    hallazgos = ejecutar_regla("ORT-001", "Aún así, la barca siguió a flote.")
+    assert [h.sugerencia for h in hallazgos] == ["Aun así"]
+    assert ejecutar_regla("ORT-001", "Aún no llega el tren.") == []

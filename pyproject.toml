@@ -76,10 +76,10 @@ onirifix = "onirifix.cli:cli"
 onirifix-gui = "onirifix.gui.app:main"
 
 [project.urls]
-Homepage = "https://github.com/onirifix/onirifix"
-Documentation = "https://github.com/onirifix/onirifix/tree/main/docs"
-Repository = "https://github.com/onirifix/onirifix"
-Issues = "https://github.com/onirifix/onirifix/issues"
+Homepage = "https://github.com/FeithNoir/OniriFix"
+Documentation = "https://github.com/FeithNoir/OniriFix/tree/main/docs"
+Repository = "https://github.com/FeithNoir/OniriFix"
+Issues = "https://github.com/FeithNoir/OniriFix/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/onirifix"]

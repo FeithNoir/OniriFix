@@ -8,7 +8,63 @@ decisión humana.
 > Estado: **alpha**. La interfaz y el esquema de la base de datos todavía pueden
 > cambiar antes de la versión 1.0.
 
-## Capturas
+## Interfaz de escritorio
+
+Además de la CLI, OniriFix trae una ventana para revisar el manuscrito con
+calma, con el mismo aspecto oscuro de TagFlow. Usa exactamente el mismo motor y
+las mismas reglas que la consola.
+
+```bash
+pip install -e ".[gui]"     # instala PySide6
+onirifix gui                # o: onirifix gui mi-novela.md
+onirifix-gui                # lanzador directo, sin consola
+```
+
+En Windows, el instalador añade **OniriFix (ventana)** al menú Inicio
+(`OniriFix-GUI.exe`).
+
+El recorrido es siempre el mismo:
+
+1. **Abre** un `.md`, `.txt` o `.docx`. El análisis empieza solo y **no toca**
+   el archivo.
+2. **Elige reglas y niveles** en el panel izquierdo (L1, L2, L3 o reglas
+   sueltas) y vuelve a analizar con `F5`.
+3. **Revisa** en la tabla. Filtra por nivel, regla, capítulo, estado o texto.
+   El inspector muestra el contexto **antes** y **después** del cambio.
+4. **Decide**: los L1 llegan aceptados, los L2 pendientes y los L3 son solo
+   avisos de lectura (no se pueden aplicar). Acepta o rechaza uno a uno
+   (teclas `A` y `R` en la tabla), con las casillas, o en bloque con
+   **Aceptar visibles** / **Rechazar visibles**.
+5. **Aplica los cambios**. Antes de escribir se guarda una copia con marca de
+   tiempo y cada cambio queda en la auditoría. Después se vuelve a analizar el
+   texto corregido.
+6. **Exporta el informe** (Markdown, CSV, JSON y el diff de lo aplicado).
+
+Mientras analiza, aplica o exporta, una capa de espera bloquea el resto de
+acciones para que nada se pise. Las secciones laterales se pliegan y la ventana
+recuerda su tamaño y el último manuscrito.
+
+### Análisis y revisión
+
+![Ventana principal con la tabla de hallazgos, el panel de reglas y el inspector con el antes y el después](docs/screenshots/11-gui-analisis.png)
+
+### Filtros por nivel, regla y capítulo
+
+![Tabla filtrada a las propuestas L2 pendientes](docs/screenshots/12-gui-filtro-l2.png)
+
+### Inspector y estadísticas
+
+![Inspector de un pretérito sin tilde aceptado y panel de estadísticas por nivel, regla y capítulo](docs/screenshots/14-gui-estadisticas.png)
+
+### Después de aplicar
+
+![Tras aplicar quedan solo los avisos L3, que nunca se modifican](docs/screenshots/15-gui-aplicado.png)
+
+El resto (inicio, capa de espera, inspector) está en
+[`docs/screenshots/`](docs/screenshots/). Las capturas salen de la ventana real
+con un relato inventado: `python scripts/capture_gui_screenshots.py`.
+
+## Capturas de la consola
 
 Las imágenes salen del ejecutable empaquetado, ejecutado en consolas reales de
 Windows. No son maquetas ni capturas de los tests.
@@ -38,13 +94,14 @@ El resto de capturas (ayuda, registro, informes) está en
 
 ## Instalación en Windows
 
-`dist\` contiene dos artefactos equivalentes en código, pero pensados para usos
+`dist\` contiene tres artefactos equivalentes en código, pero pensados para usos
 distintos:
 
 | Artefacto | Para qué sirve |
 | :--- | :--- |
 | `OniriFix-Setup-0.1.0.exe` | Instalador con asistente, accesos directos y desinstalador. |
-| `OniriFix.exe` | Ejecutable portable; no necesita instalación ni Python. |
+| `OniriFix.exe` | CLI portable; no necesita instalación ni Python. |
+| `OniriFix-GUI.exe` | Interfaz de escritorio portable, sin consola. |
 
 ### Instalador
 
@@ -102,6 +159,8 @@ El portable escribe en el directorio actual salvo que se defina
 - Copias de seguridad con marca de tiempo antes de escribir.
 - Auditoría de cambios en SQLite.
 - Informes Markdown, CSV, JSON y diff.
+- Interfaz de escritorio opcional (PySide6) para revisar, aceptar o rechazar
+  hallazgos y aplicar con copia de seguridad.
 - Reglas enchufables y descubrimiento automático.
 - Dependencias opcionales para spaCy (POS tagging) y Hunspell (spylls).
 
@@ -131,6 +190,7 @@ Dependencias opcionales:
 pip install -e ".[nlp]"        # spaCy (requiere descargar un modelo)
 pip install -e ".[ortografia]" # spylls + diccionario Hunspell
 pip install -e ".[docx]"       # lectura de .docx
+pip install -e ".[gui]"        # interfaz de escritorio (PySide6)
 ```
 
 ## Inicio rápido
@@ -189,6 +249,7 @@ onirifix frecuencia ARCHIVO
 onirifix duplicados ARCHIVO
 onirifix reglas
 onirifix doctor
+onirifix gui [ARCHIVO]
 
 onirifix registro obras listar
 onirifix registro obras crear "Mi novela" --autor "Autora"
@@ -244,6 +305,7 @@ src/onirifix/
   nucleo/             Motor de reglas, registro, parches y backups
   reglas/             Catálogo L1/L2/L3
   informes/           Markdown, CSV, JSON y terminal
+  gui/                Interfaz de escritorio PySide6
   io/                 Carga y escritura de manuscritos
 config/reglas.yaml    Configuración editable
 examples/             Obra y manuscrito de ejemplo
@@ -264,6 +326,9 @@ OniriFix.spec         Empaquetado PyInstaller
   y flujo de datos.
 - [`docs/files/reglas.md`](docs/files/reglas.md): catálogo y criterios de cada
   regla.
+- [`docs/files/cobertura-informe.md`](docs/files/cobertura-informe.md): qué
+  correcciones del informe editorial automatiza cada regla y cuáles quedan
+  para la revisión manual.
 - [`docs/files/registro.md`](docs/files/registro.md): modelo del registro SQLite
   e importación/exportación.
 - [`docs/files/diseno_cli.md`](docs/files/diseno_cli.md): principios de la CLI,
@@ -287,15 +352,18 @@ Para generar los artefactos de Windows:
 .\scripts\build_release.ps1
 ```
 
-El script deja `dist\OniriFix.exe` y `dist\OniriFix-Setup-0.1.0.exe`. Las
-capturas de la documentación se regeneran abriendo consolas reales:
+El script deja `dist\OniriFix.exe`, `dist\OniriFix-GUI.exe` y
+`dist\OniriFix-Setup-0.1.0.exe`. Las capturas de la consola se regeneran
+abriendo consolas reales; las de la ventana, con Qt en modo `offscreen`:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\capture_screenshots.py
+.\.venv\Scripts\python.exe scripts\capture_gui_screenshots.py
 ```
 
 Las pruebas no requieren spaCy ni Hunspell. Las dependencias opcionales se
-prueban con el marcador `lento`.
+prueban con el marcador `lento`. Las de la interfaz (`tests/test_gui.py`) se
+ejecutan en modo `offscreen` y se omiten si PySide6 no está instalado.
 
 ## Licencia
 

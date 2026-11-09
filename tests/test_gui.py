@@ -23,7 +23,7 @@ pytestmark = pytest.mark.gui
 TEXTO = (
     "# Capítulo 1\n\n"
     "—Basta. —Dijo Lina.\n\n"
-    "Tomás se inclinó hacía adelante...\n\n"
+    "Tomás dio dos pasos hacía adelante...\n\n"
     "# Capítulo 2\n\n"
     "Vienes mañana?\n\n"
     "La la tarde caía sobre el puerto.\n"
@@ -122,7 +122,7 @@ def test_flujo_completo_analizar_revisar_aplicar(ventana, tmp_path: Path) -> Non
     _esperar(ventana)
     assert rutas and {"md", "csv", "json", "diff"} <= set(rutas[0])
     diff = (carpeta / "parches.diff").read_text(encoding="utf-8")
-    assert "+Tomás se inclinó hacia adelante..." in diff
+    assert "+Tomás dio dos pasos hacia adelante..." in diff
 
 
 def test_capa_ocupado_bloquea_acciones_concurrentes(ventana, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
@@ -147,3 +147,13 @@ def test_inspector_muestra_antes_y_despues(ventana, tmp_path: Path) -> None:  # 
     hallazgo = ventana.sesion.hallazgos[0]
     antes, despues = vista_previa(ventana.resultado.documento.texto, hallazgo)
     assert "hacía" in antes and "hacia" in despues
+
+
+def test_comando_gui_registrado() -> None:
+    from click.testing import CliRunner
+
+    from onirifix.cli import cli
+
+    resultado = CliRunner().invoke(cli, ["gui", "--help"])
+    assert resultado.exit_code == 0
+    assert "interfaz de escritorio" in resultado.output
