@@ -76,10 +76,12 @@ def escribir_informes(
             escribir_json(resultado, ruta, correccion=correccion)
         elif formato == "diff" and correccion is not None:
             ruta.write_text(
+                # El diff parte del texto que se corrigió, que puede no ser el
+                # del análisis actual (la GUI vuelve a analizar tras aplicar).
                 crear_diff(
-                    resultado.documento.texto,
+                    correccion.analisis.documento.texto,
                     correccion.texto_corregido,
-                    resultado.documento.ruta.name,
+                    correccion.analisis.documento.ruta.name,
                 ),
                 encoding="utf-8",
             )

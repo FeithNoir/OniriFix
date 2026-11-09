@@ -33,15 +33,13 @@ from onirifix.informes.terminal import (
 from onirifix.io.cargadores import ErrorLectura
 from onirifix.log import configurar_logging
 from onirifix.modelo import Nivel, Obra, Parche, ResultadoCorreccion
-from onirifix.nucleo.backups import crear_backup
-from onirifix.nucleo.parches import aplicar_parches
 from onirifix.nucleo.registro_reglas import descubrir_reglas
 from onirifix.servicio import (
     abrir_contexto,
     analizar,
+    aplicar_seleccion,
     corregir,
     parsear_niveles,
-    registrar_auditoria,
 )
 from onirifix.util import configurar_salida_utf8, slugify
 
@@ -436,39 +434,15 @@ def revisar_cmd(
             if parche:
                 parches.append(parche)
 
-        texto, aplicados, omitidos = aplicar_parches(resultado.documento.texto, parches)
-        correccion = ResultadoCorreccion(
-            analisis=resultado,
-            texto_corregido=texto,
-            parches_seleccionados=parches,
-            aplicados=aplicados,
-            omitidos=omitidos,
+        correccion = aplicar_seleccion(
+            ctx,
+            resultado,
+            parches,
+            aplicar=not simular,
+            backup=backup_final,
+            destino=destino,
+            archivo=archivo,
         )
-        if aplicados and not simular:
-            destino_final = (destino or archivo).expanduser()
-            if (
-                resultado.documento.encoding == "docx"
-                and destino_final.suffix.lower() == ".docx"
-            ):
-                raise click.ClickException(
-                    "La escritura .docx no está implementada; usa --destino archivo.md."
-                )
-            if destino_final.resolve() == archivo.resolve() and backup_final:
-                correccion.backup = crear_backup(archivo, settings.backups)
-            from onirifix.io.cargadores import escribir_texto
-
-            encoding = (
-                "utf-8"
-                if resultado.documento.encoding == "docx"
-                else resultado.documento.encoding
-            )
-            escribir_texto(destino_final, texto, encoding=encoding)
-            correccion.escrito = True
-            correccion.destino = destino_final
-            if settings.auditoria:
-                registrar_auditoria(ctx, resultado, aplicados)
-        elif simular:
-            correccion.escrito = False
 
         if salida is not None:
             rutas = _escribir(
@@ -553,6 +527,32 @@ def duplicados_cmd(
 
 
 # ---------------------------------------------------------------------------
+# Interfaz de escritorio
+# ---------------------------------------------------------------------------
+
+
+@cli.command("gui")
+@click.argument(
+    "archivo",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.pass_obj
+@manejar_errores
+def gui_cmd(obj: dict[str, Any], archivo: Path | None) -> None:
+    """Abre la interfaz de escritorio (requiere el extra [gui])."""
+
+    if importlib.util.find_spec("PySide6") is None:
+        raise click.ClickException(
+            "La interfaz necesita PySide6. Instálala con: pip install -e \".[gui]\" "
+            "(en Windows, abre OniriFix-GUI.exe)."
+        )
+    from onirifix.gui.app import main as lanzar_gui
+
+    raise click.exceptions.Exit(lanzar_gui([sys.argv[0]], settings=_settings(obj), archivo=archivo))
+
+
+# ---------------------------------------------------------------------------
 # Diagnóstico
 # ---------------------------------------------------------------------------
 
@@ -585,6 +585,7 @@ def doctor_cmd(obj: dict[str, Any]) -> None:
         ("spacy", "spacy", False),
         ("spylls", "spylls", False),
         ("docx", "python-docx", False),
+        ("PySide6", "PySide6 (interfaz)", False),
     ):
         presente = importlib.util.find_spec(modulo) is not None
         estado = "ok" if presente else ("falta" if obligatorio else "opcional, no instalado")

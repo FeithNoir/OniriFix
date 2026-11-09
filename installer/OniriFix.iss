@@ -10,6 +10,7 @@
 #define AppVersion "0.1.0"
 #define AppPublisher "OniriFix contributors"
 #define AppExeName "OniriFix.exe"
+#define AppGuiExeName "OniriFix-GUI.exe"
 #define ProjectRoot ".."
 
 [Setup]
@@ -55,6 +56,7 @@ Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; Gr
 
 [Files]
 Source: "{#ProjectRoot}\dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ProjectRoot}\dist\{#AppGuiExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ProjectRoot}\installer\onirifix-shell.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ProjectRoot}\config\reglas.yaml"; DestDir: "{app}\config"; Flags: ignoreversion
 Source: "{#ProjectRoot}\examples\*"; DestDir: "{app}\examples"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -68,13 +70,14 @@ Source: "{#ProjectRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#ProjectRoot}\.env.template"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
+Name: "{group}\OniriFix (ventana)"; Filename: "{app}\{#AppGuiExeName}"; WorkingDir: "%USERPROFILE%"; Comment: "Revisar un manuscrito con la interfaz de escritorio"
 Name: "{group}\OniriFix"; Filename: "{app}\onirifix-shell.cmd"; WorkingDir: "%USERPROFILE%"; IconFilename: "{app}\{#AppExeName}"; Comment: "Abrir OniriFix en una terminal"
 Name: "{group}\Carpeta de OniriFix"; Filename: "{app}"; Comment: "Abrir la carpeta de instalación"
 Name: "{group}\Desinstalar OniriFix"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\OniriFix"; Filename: "{app}\onirifix-shell.cmd"; WorkingDir: "%USERPROFILE%"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\OniriFix"; Filename: "{app}\{#AppGuiExeName}"; WorkingDir: "%USERPROFILE%"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\onirifix-shell.cmd"; Description: "Abrir OniriFix"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppGuiExeName}"; Description: "Abrir OniriFix"; Flags: nowait postinstall skipifsilent
 
 [Registry]
 Root: HKA; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NeedsAddPath(ExpandConstant('{app}'))

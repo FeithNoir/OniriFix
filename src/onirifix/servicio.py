@@ -14,12 +14,14 @@ from onirifix.modelo import (
     Nivel,
     Obra,
     Parche,
+    Regla,
     ResultadoAnalisis,
     ResultadoCorreccion,
 )
 from onirifix.nucleo.backups import crear_backup
 from onirifix.nucleo.motor import Motor
 from onirifix.nucleo.parches import aplicar_parches, seleccionar_parches
+from onirifix.nucleo.registro_reglas import descubrir_reglas
 
 
 @dataclass(slots=True)
@@ -109,13 +111,42 @@ def corregir(
         aplicar_l2=aplicar_l2,
         umbral_l2=umbral_l2,
     )
+    return aplicar_seleccion(
+        ctx,
+        analisis,
+        parches,
+        aplicar=aplicar,
+        backup=backup,
+        destino=destino,
+        archivo=archivo,
+    )
+
+
+def aplicar_seleccion(
+    ctx: ContextoEjecucion,
+    analisis: ResultadoAnalisis,
+    parches: list[Parche],
+    *,
+    aplicar: bool = True,
+    backup: bool = True,
+    destino: Path | None = None,
+    archivo: Path | None = None,
+) -> ResultadoCorreccion:
+    """Aplica una selección concreta de parches sobre el texto analizado.
+
+    Es el único camino de escritura: lo usan ``corregir`` (selección por nivel
+    y umbral) y la interfaz de escritorio (selección hecha a mano). Crea la
+    copia de seguridad si se escribe sobre el original y registra la auditoría.
+    """
+
+    archivo = archivo or analisis.documento.ruta
     texto_corregido, aplicados, omitidos = aplicar_parches(
         analisis.documento.texto, parches
     )
     correccion = ResultadoCorreccion(
         analisis=analisis,
         texto_corregido=texto_corregido,
-        parches_seleccionados=parches,
+        parches_seleccionados=list(parches),
         aplicados=aplicados,
         omitidos=omitidos,
     )
@@ -141,6 +172,43 @@ def corregir(
         registrar_auditoria(ctx, analisis, aplicados)
 
     return correccion
+
+
+def max_por_regla(config: Configuracion) -> int:
+    try:
+        return int(config.obtener("informes.max_por_regla", 300) or 300)
+    except (TypeError, ValueError):
+        return 300
+
+
+def exportar_informes(
+    ctx: ContextoEjecucion,
+    resultado: ResultadoAnalisis,
+    salida: Path,
+    *,
+    formatos: str = "md,csv,json",
+    correccion: ResultadoCorreccion | None = None,
+) -> dict[str, Path]:
+    """Escribe los informes de un análisis (y su corrección, si la hay)."""
+
+    from onirifix.informes import escribir_informes
+
+    return escribir_informes(
+        resultado,
+        salida,
+        formatos=formatos,
+        correccion=correccion,
+        max_por_regla=max_por_regla(ctx.config),
+    )
+
+
+def catalogo_reglas(config: Configuracion) -> list[tuple[Regla, bool]]:
+    """Todas las reglas registradas con su estado según la configuración."""
+
+    return [
+        (regla, config.regla_activa(regla.id, regla.por_defecto))
+        for regla in descubrir_reglas()
+    ]
 
 
 def registrar_auditoria(
