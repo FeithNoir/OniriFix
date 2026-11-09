@@ -14,9 +14,11 @@ ASSETS = RAIZ / "src" / "onirifix" / "assets"
 # no puede ver esos imports dinámicos, así que los declaramos explícitamente.
 REGLAS = [
     "onirifix.reglas.consistencia",
+    "onirifix.reglas.diacriticas",
     "onirifix.reglas.dialogos",
     "onirifix.reglas.homofonos",
     "onirifix.reglas.ortografia",
+    "onirifix.reglas.preterito",
     "onirifix.reglas.repeticion",
     "onirifix.reglas.tildes",
     "onirifix.reglas.tipografia",

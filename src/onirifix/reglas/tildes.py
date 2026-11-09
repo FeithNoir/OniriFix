@@ -143,21 +143,126 @@ def _palabra_despues(texto: str, posicion: int) -> str:
     return coincidencia.group(1).casefold() if coincidencia else ""
 
 
+# Palabras que, justo después de «hacía», delatan la preposición de dirección.
+_DESTINOS_DE_HACIA = {
+    "adelante": 0.93,
+    "atrás": 0.93,
+    "arriba": 0.93,
+    "abajo": 0.93,
+    "afuera": 0.93,
+    "adentro": 0.93,
+    "delante": 0.9,
+    "allí": 0.92,
+    "allá": 0.92,
+    "aquí": 0.92,
+    "acá": 0.92,
+    "donde": 0.92,
+    "dónde": 0.92,
+    "mí": 0.92,
+    "ti": 0.92,
+    "sí": 0.9,
+    "nosotros": 0.88,
+    "nosotras": 0.88,
+    "ustedes": 0.88,
+    "vosotros": 0.88,
+    # «lo que hacía él» es posible: confianza baja a propósito.
+    "él": 0.8,
+    "ella": 0.8,
+    "ellos": 0.8,
+    "ellas": 0.8,
+}
+
+# Raíces de verbos de movimiento u orientación y sustantivos de mirada o
+# rumbo. Si «hacía» las sigue, casi siempre es la preposición mal acentuada.
+_ANTES_DE_HACIA_DIRECCION = re.compile(
+    r"^(?:gir|mir|inclin|camin|corr|avanz|dirig|volte|señal|apunt|lanz|empuj|"
+    r"extend|extendi|estir|acerc|retroced|arrastr|desliz|precipit|abalanz|orient|"
+    r"levant|alz|baj|arroj|cabece|asom|desplaz|march|cruz|regres|volv|torc|"
+    r"encamin|empuj|tend|corri|sali|salt|vol|huy|hu[ií])[a-záéíóúñ]*$",
+    re.IGNORECASE,
+)
+_SUSTANTIVOS_DE_RUMBO = {
+    "mirada",
+    "vista",
+    "ojos",
+    "camino",
+    "rumbo",
+    "pasos",
+    "cabeza",
+    "mano",
+    "manos",
+    "brazo",
+    "brazos",
+    "dedo",
+    "espalda",
+    "rostro",
+    "cara",
+}
+
+
+def _palabra_previa_cercana(texto: str, posicion: int) -> str:
+    """Palabra anterior aunque haya una coma o un pronombre en medio."""
+
+    coincidencia = re.search(
+        r"([^\W\d_]+)(?:\s+(?:se|me|te|le|la|lo|nos|les))?\s*$",
+        texto[max(0, posicion - 60) : posicion],
+        re.UNICODE,
+    )
+    return coincidencia.group(1).casefold() if coincidencia else ""
+
+
 @registrar
 class HaciaHacia:
     id = "TIL-001"
     nivel = Nivel.L2
-    descripcion = "Distingue la preposición «hacia» del imperfecto «hacía»."
+    descripcion = "Distingue la preposición «hacia» del imperfecto «hacía» (en ambos sentidos)."
     prioridad = 40
     por_defecto = True
 
     _patron = re.compile(
         r"\bhacia\b", flags=re.IGNORECASE | re.UNICODE
     )
+    _patron_tilde = re.compile(r"\bhacía\b", flags=re.IGNORECASE | re.UNICODE)
 
     def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
         if not bool(ctx.config.obtener("tildes.hacia", True)):
             return
+        yield from self._hacia_por_hacia(texto)
+        yield from self._hacia_sin_tilde(texto, ctx)
+
+    def _hacia_por_hacia(self, texto: str) -> Iterator[Hallazgo]:
+        """«hacía» usado como preposición de dirección → «hacia»."""
+
+        for match in self._patron_tilde.finditer(texto):
+            anterior = _palabra_antes(texto, match.start())
+            siguiente = _palabra_despues(texto, match.end())
+            if siguiente in _SUSTANTIVOS_DE_HACER or anterior in _PRONOMBRES_DE_HACER:
+                continue
+            confianza = _DESTINOS_DE_HACIA.get(siguiente, 0.0)
+            motivo = "Le sigue un destino o un pronombre tónico: es dirección."
+            if confianza == 0.0:
+                previa = _palabra_previa_cercana(texto, match.start())
+                if previa in _SUSTANTIVOS_DE_RUMBO or _ANTES_DE_HACIA_DIRECCION.match(previa):
+                    confianza = 0.88
+                    motivo = f"Tras «{previa}» indica dirección: preposición sin tilde."
+            if confianza == 0.0:
+                continue
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start(),
+                fin=match.end(),
+                sugerencia=preservar_caso(match.group(0), "hacia"),
+                confianza=confianza,
+                nota=motivo,
+            )
+            if hallazgo:
+                yield hallazgo
+
+    def _hacia_sin_tilde(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        """«hacia» usado como verbo hacer → «hacía»."""
+
         for match in self._patron.finditer(texto):
             oracion, _, _ = oracion_alrededor(texto, match.start(), match.end())
             anterior = _palabra_antes(texto, match.start())

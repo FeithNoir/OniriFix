@@ -202,3 +202,109 @@ class EspacioDespuesDeRaya:
             )
             if hallazgo:
                 yield hallazgo
+
+
+def _rayas_previas_en_linea(texto: str, posicion: int) -> int:
+    inicio_linea = texto.rfind("\n", 0, posicion) + 1
+    return texto.count("—", inicio_linea, posicion)
+
+
+def _es_linea_de_dialogo(texto: str, posicion: int) -> bool:
+    inicio_linea = texto.rfind("\n", 0, posicion) + 1
+    return texto[inicio_linea:posicion].lstrip(" \t").startswith("—")
+
+
+@registrar
+class AtribucionSinRaya:
+    """DIA-006: «—¿En qué piensas? / Preguntó Feith» → «—¿En qué piensas? —preguntó Feith»."""
+
+    id = "DIA-006"
+    nivel = Nivel.L2
+    descripcion = "Une el verbo de habla suelto al parlamento con raya y minúscula."
+    prioridad = 9
+    por_defecto = True
+
+    # Caso A: el verbo quedó en la línea (o párrafo) siguiente.
+    _salto = re.compile(
+        r"(?P<cierre>[.,!?…]?)(?P<hueco>[ \t]*\n{1,2}[ \t]*)" + _VERBO_CAPITAL
+    )
+    # Caso B: el verbo sigue en la misma línea, pero sin raya.
+    _misma_linea = re.compile(
+        r"(?P<cierre>[.,!?…])(?P<hueco>[ \t]+)" + _VERBO_CAPITAL
+    )
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        verbos = verbos_habla(ctx)
+        for patron, caso in ((self._salto, "salto"), (self._misma_linea, "linea")):
+            for match in patron.finditer(texto):
+                if not _es_verbo(match.group("verbo"), verbos):
+                    continue
+                # La línea donde acaba el parlamento tiene que abrir con raya.
+                if not _es_linea_de_dialogo(texto, match.start()):
+                    continue
+                # En la misma línea, el verbo debe caer dentro del parlamento
+                # (número impar de rayas antes), no tras un inciso ya cerrado.
+                if caso == "linea" and _rayas_previas_en_linea(texto, match.start()) % 2 == 0:
+                    continue
+                # «…dijo él—. Preguntó»: el punto cierra un inciso, no un parlamento.
+                if texto[: match.start()].endswith("—"):
+                    continue
+                cierre = match.group("cierre")
+                # Con punto o coma, el signo se cae: «—Basta —dijo».
+                conservado = cierre if cierre in {"!", "?", "…"} else ""
+                sugerencia = f"{conservado} —{minuscula_inicial(match.group('verbo'))}"
+                confianza = 0.86 if caso == "salto" else 0.88
+                hallazgo = crear_hallazgo(
+                    texto,
+                    regla=self.id,
+                    nivel=self.nivel,
+                    inicio=match.start(),
+                    fin=match.end(),
+                    sugerencia=sugerencia,
+                    confianza=confianza,
+                    nota=(
+                        "El verbo de habla va unido al parlamento con raya y en minúscula; "
+                        "si había punto, desaparece (—Basta —dijo)."
+                    ),
+                )
+                if hallazgo:
+                    yield hallazgo
+
+
+@registrar
+class IncisoSinCerrar:
+    """DIA-007: «—Hola —dijo Mico. ¿Vienes?» → «—Hola —dijo Mico—. ¿Vienes?»."""
+
+    id = "DIA-007"
+    nivel = Nivel.L2
+    descripcion = "Cierra con raya el inciso del narrador cuando el parlamento continúa."
+    prioridad = 11
+    por_defecto = True
+
+    _patron = re.compile(
+        r"(?<=\S)[ \t]—" + _VERBO_ATRIBUCION + r"(?P<resto>[^—\n.;:!?…]*?)"
+        r"(?P<signo>[.,])(?P<espacio>[ \t]+)(?=[¿¡])"
+    )
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        verbos = verbos_habla(ctx)
+        for match in self._patron.finditer(texto):
+            if not _es_verbo(match.group("verbo"), verbos):
+                continue
+            if not _es_linea_de_dialogo(texto, match.start()):
+                continue
+            # La raya del inciso debe ser la segunda de su tramo (abre el inciso).
+            if _rayas_previas_en_linea(texto, match.start()) % 2 == 0:
+                continue
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start("signo"),
+                fin=match.end("signo"),
+                sugerencia=f"—{match.group('signo')}",
+                confianza=0.84,
+                nota="El parlamento continúa tras el inciso: la raya de cierre va antes del signo.",
+            )
+            if hallazgo:
+                yield hallazgo

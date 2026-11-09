@@ -56,7 +56,7 @@ def test_importar_ejemplo_y_analizar(
 
     assert "OniriFix" in resultado.output
     assert "oniriums" in resultado.output
-    assert "Reglas: 26" in resultado.output
+    assert "Reglas: 40" in resultado.output
 
 
 def test_analizar_escribe_informes_y_estricto_falla(

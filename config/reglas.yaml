@@ -58,6 +58,20 @@ reglas:
   REP-002: true
   REP-003: true
   REP-004: true
+  TIP-011: true
+  TIP-012: true
+  TIP-013: true
+  TIP-014: true
+  TIP-015: true
+  DIA-006: true
+  DIA-007: true
+  TIL-003: true
+  TIL-004: true
+  TIL-005: true
+  TIL-006: true
+  ORT-004: true
+  REP-005: true
+  REP-006: true
 
 # ---------------------------------------------------------------------------
 # Tipografía mecánica (L1)
@@ -95,6 +109,15 @@ tildes:
   permitir_voseo: false
   # Palabras terminadas en á que la regla debe ignorar siempre.
   palabras_validas_extra: []
+  # TIL-003/TIL-004: pretéritos sin tilde (miro → miró) y su espejo (un suspiró → un suspiro).
+  preteritos: true
+  # Pretérito de reír. La RAE (2010) escribe «rio» sin tilde; el informe editorial
+  # pide «rió». Con "rio", la regla deja de marcar «rio» y solo corrige «río».
+  forma_rio: rió
+  # TIL-005: Sé/Sí/él/qué en contextos inequívocos.
+  diacriticas: true
+  # TIL-006: futuro en lugar de subjuntivo («como si esperará» → «esperara»).
+  subjuntivos: true
 
 # ---------------------------------------------------------------------------
 # Ortografía
@@ -263,6 +286,19 @@ duplicados:
   # Protección de rendimiento: a partir de este número de párrafos solo se
   # comparan bloques con una longitud parecida.
   maximo_parrafos: 2000
+  # REP-005: párrafos u oraciones idénticos seguidos (propone borrar la copia).
+  minimo_palabras_consecutivo: 4
+  minimo_palabras_oracion: 3
+
+# ---------------------------------------------------------------------------
+# Residuos de borrador y términos vetados (REP-006, solo informe)
+# ---------------------------------------------------------------------------
+residuos_borrador:
+  # Expresiones regulares extra (sin distinguir mayúsculas) que se suman a las
+  # internas: «Aquí tienes», «(Contexto anterior…)», «Escena ampliada», [TODO]…
+  patrones: []
+  # Anacronismos o préstamos que la obra no admite. Ejemplo: [jeans, cool]
+  vetados: []
 
 # ---------------------------------------------------------------------------
 # Residuo de IA (L3, solo informe)

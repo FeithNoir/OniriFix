@@ -179,7 +179,7 @@ class Apostrofos:
 class RayasDeDialogo:
     id = "TIP-007"
     nivel = Nivel.L1
-    descripcion = "Normaliza guiones y en dashes usados como raya de diálogo."
+    descripcion = "Normaliza guiones (simple, doble o en dash) usados como raya de diálogo."
     prioridad = 50
     por_defecto = True
 
@@ -187,6 +187,11 @@ class RayasDeDialogo:
     _inicio_doble_guion = re.compile(r"(?m)^(?P<indent>[ \t]*)--[ \t]*(?!-)(?=\S)")
     _inciso_en_dash = re.compile(r"(?<=\S)[ \t]–[ \t]*(?=\S)")
     _inciso_doble_guion = re.compile(r"(?<=\s)--(?=\s)")
+    # «-Serán cinco puntos»: guion simple pegado al parlamento. Con espacio
+    # detrás («- item») es una lista Markdown y no se toca.
+    _inicio_guion_simple = re.compile(
+        r"(?m)^(?P<indent>[ \t]*)-(?=[¿¡A-ZÁÉÍÓÚÜÑa-záéíóúüñ])"
+    )
 
     def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
         if not bool(ctx.config.obtener("tipografia.rayas", True)):
@@ -196,6 +201,7 @@ class RayasDeDialogo:
             (self._inicio_doble_guion, lambda m: f"{m.group('indent')}—"),
             (self._inciso_en_dash, lambda m: " —"),
             (self._inciso_doble_guion, lambda m: "—"),
+            (self._inicio_guion_simple, lambda m: f"{m.group('indent')}—"),
         ):
             for match in patron.finditer(texto):
                 hallazgo = crear_hallazgo(
@@ -290,3 +296,174 @@ class ComillasDesbalanceadas:
                 if hallazgo:
                     yield hallazgo
             posicion += len(linea)
+
+
+@registrar
+class ElipsisCorrupta:
+    id = "TIP-011"
+    nivel = Nivel.L1
+    descripcion = "Limpia puntos pegados a los puntos suspensivos («.…», «….» → «…»)."
+    prioridad = 9
+    por_defecto = True
+
+    _patron = re.compile(r"\.+…+\.*|…+\.+|…{2,}")
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        if not bool(ctx.config.obtener("tipografia.puntos_suspensivos", True)):
+            return
+        for match in self._patron.finditer(texto):
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start(),
+                fin=match.end(),
+                sugerencia="…",
+                confianza=0.96,
+                nota="Tras los puntos suspensivos no se añade punto (ni antes).",
+            )
+            if hallazgo:
+                yield hallazgo
+
+
+@registrar
+class SignoDeCierreInvertido:
+    id = "TIP-012"
+    nivel = Nivel.L1
+    descripcion = "Corrige un signo de apertura usado como cierre («¡Lo siento ¡» → «¡Lo siento!»)."
+    prioridad = 8
+    por_defecto = True
+
+    _patron = re.compile(
+        r"(?P<abre>[¡¿])(?P<interior>[^¡!¿?\n]{1,300}?)(?P<esp>[ \t]*)(?P<cierre>[¡¿])(?=[ \t]*(?:$|[\n»”\"—)]))",
+        re.MULTILINE,
+    )
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        for match in self._patron.finditer(texto):
+            correcto = "!" if match.group("abre") == "¡" else "?"
+            if match.group("cierre") != match.group("abre"):
+                continue
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start("esp"),
+                fin=match.end("cierre"),
+                sugerencia=correcto,
+                confianza=0.94,
+                nota="El signo de cierre está invertido.",
+            )
+            if hallazgo:
+                yield hallazgo
+
+
+@registrar
+class SignoDeAperturaFaltante:
+    id = "TIP-013"
+    nivel = Nivel.L3
+    descripcion = "Avisa de preguntas o exclamaciones sin signo de apertura (¿ ¡)."
+    prioridad = 94
+    por_defecto = True
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        inicio_linea = 0
+        for linea in texto.split("\n"):
+            abiertos = {"?": 0, "!": 0}
+            posicion = 0
+            while posicion < len(linea):
+                caracter = linea[posicion]
+                if caracter == "¿":
+                    abiertos["?"] += 1
+                elif caracter == "¡":
+                    abiertos["!"] += 1
+                elif caracter in "?!":
+                    fin = posicion
+                    while fin < len(linea) and linea[fin] in "?!":
+                        fin += 1
+                    racha = linea[posicion:fin]
+                    if abiertos["?"] > 0 and "?" in racha:
+                        abiertos["?"] -= 1
+                    elif abiertos["!"] > 0 and "!" in racha:
+                        abiertos["!"] -= 1
+                    else:
+                        apertura = "¿" if racha[0] == "?" else "¡"
+                        hallazgo = crear_hallazgo(
+                            texto,
+                            regla=self.id,
+                            nivel=self.nivel,
+                            inicio=inicio_linea + posicion,
+                            fin=inicio_linea + fin,
+                            sugerencia=None,
+                            confianza=0.7,
+                            nota=f"Falta el signo de apertura «{apertura}»: colócalo donde empieza la pregunta o exclamación.",
+                        )
+                        if hallazgo:
+                            yield hallazgo
+                    posicion = fin
+                    continue
+                posicion += 1
+            inicio_linea += len(linea) + 1
+
+
+@registrar
+class ComillasInglesas:
+    id = "TIP-014"
+    nivel = Nivel.L2
+    descripcion = "Propone unificar comillas inglesas “…” al estilo configurado («…»)."
+    prioridad = 41
+    por_defecto = True
+
+    _patron = re.compile(r"“(?P<interior>[^“”\n]{1,2000})”")
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        if not bool(ctx.config.obtener("tipografia.convertir_comillas", True)):
+            return
+        apertura, cierre = ctx.config.comillas[0], ctx.config.comillas[1]
+        if apertura == "“":
+            return
+        for match in self._patron.finditer(texto):
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start(),
+                fin=match.end(),
+                sugerencia=f"{apertura}{match.group('interior')}{cierre}",
+                confianza=0.6,
+                nota=(
+                    "Comillas inglesas. Si el texto es un pensamiento y la obra reserva “…” "
+                    "para pensamientos, rechaza el cambio."
+                ),
+            )
+            if hallazgo:
+                yield hallazgo
+
+
+@registrar
+class EspacioTrasApertura:
+    id = "TIP-015"
+    nivel = Nivel.L1
+    descripcion = "Elimina el espacio tras ¿ ¡ « y antes de » («¿ Vienes ?» → «¿Vienes?»)."
+    prioridad = 21
+    por_defecto = True
+
+    _patron = re.compile(r"(?P<signo>[¿¡«])[ \t]+(?=\S)|(?<=\S)[ \t]+(?P<cierre>»)")
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        if not bool(ctx.config.obtener("tipografia.espacios", True)):
+            return
+        for match in self._patron.finditer(texto):
+            sugerencia = match.group("signo") or match.group("cierre")
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start(),
+                fin=match.end(),
+                sugerencia=sugerencia,
+                confianza=0.97,
+                nota="Los signos dobles van pegados a la palabra que encierran.",
+            )
+            if hallazgo:
+                yield hallazgo
