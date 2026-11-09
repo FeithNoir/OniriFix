@@ -104,6 +104,8 @@ def test_tip_014_respeta_estilo_ingles() -> None:
 
 def test_tip_015_espacios_dentro_de_signos() -> None:
     assert _corrige("TIP-015", "¿ Vienes? ¡ Ya! « hola »") == "¿Vienes? ¡Ya! «hola»"
+    # «¡» pegado a la palabra anterior es un cierre mal escrito: no se toca.
+    assert ejecutar_regla("TIP-015", "Levantó el martillo¡ y calló.") == []
 
 
 # ---------------------------------------------------------------------------

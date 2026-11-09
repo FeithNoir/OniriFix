@@ -81,4 +81,8 @@ class PanelEstadisticas(QWidget):
             item = self.barras.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                # Fuera del layout ya: se oculta para que no se pinte encima
+                # de las barras nuevas mientras espera a destruirse.
+                widget.hide()
+                widget.setParent(None)
                 widget.deleteLater()

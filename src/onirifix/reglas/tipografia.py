@@ -448,7 +448,9 @@ class EspacioTrasApertura:
     prioridad = 21
     por_defecto = True
 
-    _patron = re.compile(r"(?P<signo>[¿¡«])[ \t]+(?=\S)|(?<=\S)[ \t]+(?P<cierre>»)")
+    # Un «¡» pegado al final de una palabra no abre nada: es un cierre mal
+    # escrito (lo trata TIP-012 o queda para revisión), así que no se toca.
+    _patron = re.compile(r"(?<!\w)(?P<signo>[¿¡«])[ \t]+(?=\S)|(?<=\S)[ \t]+(?P<cierre>»)")
 
     def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
         if not bool(ctx.config.obtener("tipografia.espacios", True)):
