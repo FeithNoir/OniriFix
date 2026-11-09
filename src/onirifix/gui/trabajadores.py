@@ -7,12 +7,14 @@ comparte ningún objeto de base de datos entre hilos.
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
 from onirifix.config import Settings
 from onirifix.modelo import Parche, ResultadoAnalisis, ResultadoCorreccion
+from onirifix.nucleo.motor import AnalisisCancelado
 from onirifix.servicio import abrir_contexto, analizar, aplicar_seleccion, exportar_informes
 
 log = logging.getLogger(__name__)
@@ -31,22 +33,47 @@ class _Trabajador(QThread):
 
 
 class TrabajadorAnalisis(_Trabajador):
-    """Carga el manuscrito y ejecuta las reglas elegidas sin modificar nada."""
+    """Carga el manuscrito y ejecuta las reglas elegidas sin modificar nada.
+
+    Emite ``avance(hechas, total, detalle)`` (total 0 = fase sin medida, como
+    leer un PDF) y se puede cancelar entre regla y regla.
+    """
 
     terminado = Signal(object)
+    avance = Signal(int, int, str)
+    cancelado = Signal()
 
     def __init__(self, settings: Settings, archivo: Path, reglas: list[str] | None) -> None:
         super().__init__(settings)
         self.archivo = archivo
         self.reglas = reglas
+        self.segundos: float | None = None
+        self._cancelar = False
+
+    def cancelar(self) -> None:
+        self._cancelar = True
+
+    def _progreso(self, hechas: int, total: int, regla: str) -> bool:
+        detalle = f"Regla {regla} · {hechas + 1} de {total}" if regla else "Ordenando hallazgos…"
+        self.avance.emit(hechas, total, detalle)
+        return not self._cancelar
 
     def run(self) -> None:
+        inicio = time.perf_counter()
         try:
+            self.avance.emit(0, 0, f"Leyendo {self.archivo.name}…")
             with abrir_contexto(self.settings, crear_obra=True) as ctx:
-                resultado = analizar(ctx, self.archivo, solo_reglas=self.reglas, incluir_l3=True)
+                resultado = analizar(
+                    ctx, self.archivo, solo_reglas=self.reglas, incluir_l3=True,
+                    progreso=self._progreso,
+                )
+        except AnalisisCancelado:
+            self.cancelado.emit()
+            return
         except Exception as exc:
             self._informar(exc)
             return
+        self.segundos = time.perf_counter() - inicio
         self.terminado.emit(resultado)
 
 
@@ -88,7 +115,7 @@ class TrabajadorAplicar(_Trabajador):
 
 
 class TrabajadorExportar(_Trabajador):
-    """Escribe los informes Markdown, CSV, JSON (y diff si hubo corrección)."""
+    """Escribe los informes (Markdown, CSV, JSON, PDF) y el diff y el PDF corregido si hubo corrección."""
 
     terminado = Signal(object)
 
@@ -100,12 +127,17 @@ class TrabajadorExportar(_Trabajador):
         *,
         formatos: str,
         correccion: ResultadoCorreccion | None = None,
+        segundos: float | None = None,
     ) -> None:
         super().__init__(settings)
-        self.resultado = resultado
+        # Tras aplicar, el informe describe el análisis que se corrigió (así
+        # cuadran aplicados y pendientes), no el nuevo análisis del texto ya
+        # corregido.
+        self.resultado = correccion.analisis if correccion is not None else resultado
         self.carpeta = carpeta
         self.formatos = formatos
         self.correccion = correccion
+        self.segundos = segundos
 
     def run(self) -> None:
         try:
@@ -116,6 +148,7 @@ class TrabajadorExportar(_Trabajador):
                     self.carpeta,
                     formatos=self.formatos,
                     correccion=self.correccion,
+                    segundos=self.segundos,
                 )
         except Exception as exc:
             self._informar(exc)

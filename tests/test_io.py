@@ -54,8 +54,8 @@ def test_leer_texto_inexistente(tmp_path: Path) -> None:
 
 
 def test_formato_no_soportado(tmp_path: Path) -> None:
-    ruta = tmp_path / "texto.pdf"
-    ruta.write_bytes(b"%PDF")
+    ruta = tmp_path / "texto.odt"
+    ruta.write_bytes(b"PK")
     with pytest.raises(ErrorLectura, match="Formato no soportado"):
         leer_texto(ruta)
 
@@ -64,7 +64,8 @@ def test_sufijos_soportados() -> None:
     assert sufijo_soportado(Path("a.md"))
     assert sufijo_soportado(Path("a.TXT"))
     assert sufijo_soportado(Path("a.docx"))
-    assert not sufijo_soportado(Path("a.pdf"))
+    assert sufijo_soportado(Path("a.pdf"))
+    assert not sufijo_soportado(Path("a.odt"))
 
 
 def test_detectar_capitulos_markdown_y_preamble() -> None:

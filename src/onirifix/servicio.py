@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from onirifix.config import Configuracion, Settings
 from onirifix.db.repositorios import Registro
-from onirifix.io.cargadores import cargar_documento, escribir_texto
+from onirifix.io.cargadores import (
+    CODIFICACIONES_DERIVADAS,
+    cargar_documento,
+    destino_corregido,
+    escribir_texto,
+)
 from onirifix.linguistica import crear_analizador, crear_corrector
 from onirifix.modelo import (
     Documento,
@@ -76,6 +82,7 @@ def analizar(
     *,
     solo_reglas: list[str] | None = None,
     incluir_l3: bool = True,
+    progreso: Callable[[int, int, str], bool | None] | None = None,
 ) -> ResultadoAnalisis:
     documento = cargar_documento(archivo)
     return ctx.motor().analizar(
@@ -83,6 +90,7 @@ def analizar(
         solo_reglas=solo_reglas,
         incluir_l3=incluir_l3,
         obra=ctx.obra,
+        progreso=progreso,
     )
 
 
@@ -103,13 +111,17 @@ def corregir(
     backup: bool,
     destino: Path | None = None,
     solo_reglas: list[str] | None = None,
+    l2_seguras: bool = False,
+    analisis: ResultadoAnalisis | None = None,
 ) -> ResultadoCorreccion:
-    analisis = analizar(ctx, archivo, solo_reglas=solo_reglas, incluir_l3=True)
+    if analisis is None:
+        analisis = analizar(ctx, archivo, solo_reglas=solo_reglas, incluir_l3=True)
     parches = seleccionar_parches(
         analisis.hallazgos,
         niveles=niveles,
         aplicar_l2=aplicar_l2,
         umbral_l2=umbral_l2,
+        l2_seguras=ctx.config.l2_seguras() if l2_seguras else None,
     )
     return aplicar_seleccion(
         ctx,
@@ -154,16 +166,23 @@ def aplicar_seleccion(
     if not aplicar or not aplicados:
         return correccion
 
+    derivado = analisis.documento.encoding in CODIFICACIONES_DERIVADAS
+    if destino is None and derivado:
+        # Un .docx o .pdf no se reescribe: el texto corregido va a un .md
+        # hermano y el original queda intacto.
+        destino = destino_corregido(archivo)
     destino_final = (destino or archivo).expanduser()
-    if analisis.documento.encoding == "docx" and destino_final.suffix.lower() == ".docx":
+    if derivado and destino_final.suffix.lower() in {".docx", ".pdf"}:
         raise ValueError(
-            "La escritura de .docx todavía no está implementada. "
-            "Usa `--destino manuscrito.md` o exporta el documento a texto."
+            f"OniriFix no reescribe {destino_final.suffix}. "
+            "Usa `--destino manuscrito.md`; el PDF corregido se exporta aparte."
         )
-    if destino_final.resolve() == archivo.resolve() and backup:
-        correccion.backup = crear_backup(archivo, ctx.settings.backups)
+    if backup and destino_final.exists() and (
+        destino_final.resolve() == archivo.resolve() or derivado
+    ):
+        correccion.backup = crear_backup(destino_final, ctx.settings.backups)
 
-    encoding = "utf-8" if analisis.documento.encoding == "docx" else analisis.documento.encoding
+    encoding = "utf-8" if derivado else analisis.documento.encoding
     escribir_texto(destino_final, texto_corregido, encoding=encoding)
     correccion.escrito = True
     correccion.destino = destino_final
@@ -188,6 +207,7 @@ def exportar_informes(
     *,
     formatos: str = "md,csv,json",
     correccion: ResultadoCorreccion | None = None,
+    segundos: float | None = None,
 ) -> dict[str, Path]:
     """Escribe los informes de un análisis (y su corrección, si la hay)."""
 
@@ -199,14 +219,21 @@ def exportar_informes(
         formatos=formatos,
         correccion=correccion,
         max_por_regla=max_por_regla(ctx.config),
+        segundos=segundos,
     )
 
 
 def catalogo_reglas(config: Configuracion) -> list[tuple[Regla, bool]]:
     """Todas las reglas registradas con su estado según la configuración."""
 
+    estricto = bool(config.obtener("dialogos.rae_estricto", False))
     return [
-        (regla, config.regla_activa(regla.id, regla.por_defecto))
+        (
+            regla,
+            config.regla_activa(regla.id, regla.por_defecto)
+            # DIA-003 se activa también con `dialogos.rae_estricto`, como en el motor.
+            or (regla.id == "DIA-003" and estricto),
+        )
         for regla in descubrir_reglas()
     ]
 
@@ -244,6 +271,6 @@ def escribir_corregido(
     respaldo = None
     if destino.resolve() == documento.ruta.resolve() and backup:
         respaldo = crear_backup(documento.ruta, ctx.settings.backups)
-    encoding = "utf-8" if documento.encoding == "docx" else documento.encoding
+    encoding = "utf-8" if documento.encoding in CODIFICACIONES_DERIVADAS else documento.encoding
     escribir_texto(destino, texto, encoding=encoding)
     return respaldo

@@ -412,7 +412,7 @@ class ComillasInglesas:
     nivel = Nivel.L2
     descripcion = "Propone unificar comillas inglesas “…” al estilo configurado («…»)."
     prioridad = 41
-    por_defecto = True
+    por_defecto = False
 
     _patron = re.compile(r"“(?P<interior>[^“”\n]{1,2000})”")
 

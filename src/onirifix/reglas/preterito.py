@@ -26,11 +26,11 @@ from onirifix.reglas._comun import es_palabra_glosario, preservar_caso
 
 # Verbos -ar regulares frecuentes en narrativa. Su 1.ª persona del presente
 # («miro») coincide con el pretérito sin tilde («miró»): son ambiguos.
-_AR_AMBIGUOS = ["mirar", "suspirar", "posar", "cambiar", "señalar", "esquivar", "pasar", "fracasar", "brillar", "tragar", "contestar", "silenciar", "girar", "levantar", "gritar", "susurrar", "murmurar", "preguntar", "observar", "asomar", "avanzar", "apartar", "tomar", "dejar", "llegar", "entrar", "sacar", "notar", "alzar", "bajar", "lanzar", "tocar", "acercar", "apoyar", "golpear", "saltar", "empujar", "intentar", "quedar", "llamar", "frenar", "terminar", "bostezar", "abrazar", "besar", "regresar", "saludar", "sollozar", "disparar", "resoplar", "carraspear", "escuchar", "esperar", "caminar", "voltear", "agarrar", "arrojar", "estirar", "sujetar", "guardar", "ignorar", "aclarar", "explicar", "replicar", "comentar", "tardar", "cruzar", "olvidar", "acariciar", "retirar", "analizar", "ajustar", "chocar", "gastar", "pagar", "firmar", "cargar", "liberar", "tirar", "marcar", "contemplar", "examinar", "lamentar", "bromear", "asegurar", "parpadear", "jadear", "gruñir", "chasquear", "sonrojar", "palidecer", "resbalar", "asentar", "arquear", "entrecerrar", "soplar", "inclinar"]
+_AR_AMBIGUOS = ["mirar", "suspirar", "posar", "cambiar", "señalar", "esquivar", "pasar", "fracasar", "brillar", "tragar", "contestar", "silenciar", "girar", "levantar", "gritar", "susurrar", "murmurar", "preguntar", "observar", "asomar", "avanzar", "apartar", "tomar", "dejar", "llegar", "entrar", "sacar", "notar", "alzar", "lanzar", "tocar", "acercar", "apoyar", "golpear", "saltar", "empujar", "intentar", "quedar", "llamar", "frenar", "terminar", "bostezar", "abrazar", "besar", "regresar", "saludar", "sollozar", "disparar", "resoplar", "carraspear", "escuchar", "esperar", "caminar", "voltear", "agarrar", "arrojar", "estirar", "sujetar", "guardar", "ignorar", "aclarar", "explicar", "replicar", "comentar", "tardar", "cruzar", "olvidar", "acariciar", "retirar", "analizar", "ajustar", "chocar", "gastar", "pagar", "firmar", "cargar", "liberar", "tirar", "marcar", "contemplar", "examinar", "lamentar", "bromear", "asegurar", "parpadear", "jadear", "gruñir", "chasquear", "sonrojar", "palidecer", "resbalar", "asentar", "arquear", "entrecerrar", "soplar", "inclinar"]
 
 # Verbos con cambio de raíz: «conto», «solto» o «encontro» no existen, así
 # que la tilde que falta es inequívoca.
-_SIN_AMBIGUEDAD = ["contar", "soltar", "mostrar", "encontrar", "recordar", "sonar", "volar", "negar", "pensar", "despertar", "empezar", "comenzar", "colgar", "rogar", "acostar", "volcar", "temblar", "tronar", "confesar", "atravesar", "calentar", "apretar"]
+_SIN_AMBIGUEDAD = ["contar", "soltar", "mostrar", "encontrar", "recordar", "sonar", "volar", "negar", "pensar", "despertar", "empezar", "comenzar", "colgar", "rogar", "acostar", "volcar", "temblar", "confesar", "atravesar", "calentar", "apretar"]
 
 # Formas sin tilde que sí existen como otra palabra y por eso no pueden ir a
 # la lista inequívoca: cerro (monte), jugo (zumo), probo (honrado), siento…
@@ -48,7 +48,6 @@ _AMBIGUOS_EXTRA = {
     "envío": "envió",
     "confío": "confió",
     "desafío": "desafió",
-    "vacío": "vació",
     "enfrío": "enfrió",
     "desvío": "desvió",
     "amplío": "amplió",
@@ -122,6 +121,10 @@ _DETERMINANTES_FUERTES = {
     "primer",
     "último",
     "dicho",
+}
+_DETERMINANTES_TRAS_VERBO = {
+    "su", "sus", "la", "las", "el", "los", "un", "una", "unos", "unas", "mi", "mis",
+    "tu", "tus", "nuestra", "nuestro", "aquel", "aquella", "esa", "ese", "esta", "este",
 }
 _ADJETIVOS_PUENTE = {
     "leve",
@@ -307,6 +310,20 @@ def _parece_preterito(palabra: str) -> bool:
     )
 
 
+_SUSTANTIVOS_FRECUENTES = {
+    "silencio", "camino", "intento", "paso", "cambio", "apoyo", "abrazo", "beso",
+    "grito", "giro", "salto", "llanto", "susurro", "regreso", "aviso", "trago",
+    "gesto", "golpe", "suspiro", "respiro", "descanso", "juego", "baño", "viaje",
+}
+
+
+def _parece_conjugado(palabra: str) -> bool:
+    return len(palabra) > 3 and (
+        palabra.endswith(("ó", "é", "aba", "aban", "ían", "aron", "ieron"))
+        or palabra in {"fue", "dio", "vio", "hizo", "tuvo", "puso", "dijo", "quiso"}
+    )
+
+
 def _tras_raya_de_atribucion(texto: str, inicio: int) -> bool:
     """«…? —contesto Mico»: la raya abre un inciso del narrador."""
 
@@ -376,7 +393,14 @@ class PreteritoSinTilde:
     ) -> tuple[float, str]:
         previo, inicio_previo = _token_previo(texto, inicio)
         previo_min = previo.casefold()
-        if previo_min in _ANTE_SUSTANTIVO and previo[:1].islower():
+        palabra_min = texto[inicio:fin].casefold()
+        # Determinante o preposición delante: es sustantivo («Otro silencio»,
+        # «Ese trago»), también cuando abre la oración en mayúscula.
+        if previo_min in _ANTE_SUSTANTIVO:
+            return 0.0, ""
+        # Verbo conjugado delante: la forma ambigua es su complemento
+        # («Buscó apoyo», «pidió cambio»).
+        if previo_min not in {"se"} and _parece_conjugado(previo_min):
             return 0.0, ""
         if previo_min in {"se"}:
             return 0.9, "«se» + 1.ª persona no concuerda: es el pretérito."
@@ -403,7 +427,10 @@ class PreteritoSinTilde:
                 and previo.islower()
                 and previo_min not in _ADJETIVOS_PUENTE
             ):
-                return 0.75, (
+                # «el tenso silencio», «el maldito camino»: con sustantivos muy
+                # frecuentes lo normal es adjetivo + sustantivo.
+                confianza = 0.6 if palabra_min in _SUSTANTIVOS_FRECUENTES else 0.75
+                return confianza, (
                     f"Tras el sujeto «{articulo} {previo}» parece el pretérito; "
                     "revisa que no sea un sustantivo."
                 )
@@ -446,6 +473,11 @@ class SustantivoConTildeDePreterito:
                 det, adj = previas.group(1), det
             etiqueta = det
             det = det.casefold()
+            siguiente = _token_siguiente(texto, match.end("palabra")).casefold()
+            # «cuando este posó su mano»: con un determinante o posesivo
+            # detrás es el verbo, y «este» era pronombre.
+            if siguiente in _DETERMINANTES_TRAS_VERBO:
+                continue
             if det in _DETERMINANTES_FUERTES:
                 confianza = 0.92 if not adj else 0.86
                 nota = f"Tras «{etiqueta}» va el sustantivo «{sustantivo}»."

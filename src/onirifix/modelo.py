@@ -6,9 +6,11 @@ El motor y las reglas solo conocen estos tipos. La persistencia vive en
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -77,6 +79,27 @@ class Hallazgo:
         return self.sugerencia is not None and self.nivel in (Nivel.L1, Nivel.L2)
 
 
+@lru_cache(maxsize=8)
+def _saltos_de_linea(texto: str) -> tuple[int, ...]:
+    """Posiciones de cada ``\\n``. Se calcula una vez por texto analizado."""
+
+    saltos: list[int] = []
+    posicion = texto.find("\n")
+    while posicion != -1:
+        saltos.append(posicion)
+        posicion = texto.find("\n", posicion + 1)
+    return tuple(saltos)
+
+
+def posicion_en_lineas(texto: str, indice: int) -> tuple[int, int]:
+    """Línea (desde 1) y columna (desde 1) de ``indice`` en ``texto``."""
+
+    saltos = _saltos_de_linea(texto)
+    previos = bisect_left(saltos, indice)
+    inicio_linea = saltos[previos - 1] if previos else -1
+    return previos + 1, indice - inicio_linea
+
+
 def crear_hallazgo(
     texto: str,
     *,
@@ -101,9 +124,7 @@ def crear_hallazgo(
     if sugerencia is not None and sugerencia == original:
         return None
 
-    linea = texto.count("\n", 0, inicio) + 1
-    inicio_linea = texto.rfind("\n", 0, inicio)
-    columna = inicio - inicio_linea
+    linea, columna = posicion_en_lineas(texto, inicio)
 
     contexto_inicio = max(0, inicio - radio_contexto)
     contexto_fin = min(len(texto), fin + radio_contexto)

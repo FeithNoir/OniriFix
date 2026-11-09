@@ -70,6 +70,7 @@ def mostrar_resultado(
     *,
     obra: str | None = None,
     rutas: dict[str, Path] | None = None,
+    segundos: float | None = None,
 ) -> None:
     consola = _consola()
     doc = resultado.documento
@@ -82,6 +83,7 @@ def mostrar_resultado(
     consola.print(
         f"Palabras: {doc.palabras} · Capítulos: {len(doc.capitulos)} · "
         f"Reglas: {len(resultado.reglas_ejecutadas)}"
+        + (f" · Análisis: {segundos:.1f} s" if segundos is not None else "")
     )
 
     if resultado.hallazgos:
@@ -92,7 +94,7 @@ def mostrar_resultado(
         for nivel in Nivel:
             grupo = resultado.por_nivel(nivel)
             niveles.add_row(
-                _nivel(nivel) + Text(f" · {nivel.value}"),
+                _nivel(nivel) + Text(f" · {nivel.etiqueta}"),
                 str(len(grupo)),
                 str(sum(1 for h in grupo if h.aplicable)),
             )

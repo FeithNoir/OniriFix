@@ -384,12 +384,31 @@ PATRONES_RESIDUO_BORRADOR: tuple[str, ...] = (
     r"nota del autor",
     r"n\. del a\.",
     r"\[(?:insertar|nota|pendiente|todo|tbd|revisar)[^\]\n]*\]",
-    r"(?-i:\b(?:TODO|FIXME|XXX|TBD)\b)",
+    # Marcadores en mayúsculas seguidos de «:», «]» o «(»: «TODO LO QUE…»
+    # gritado en un diálogo no es una nota de borrador.
+    r"(?-i:\b(?:TODO|FIXME|XXX|TBD)\b(?=[ \t]*[:\](]))",
     r"lorem ipsum",
     r"\*\*[^*\n]{1,80}\*\*",
     r"```",
     r"sobre la trama",
 )
+
+
+# Fórmulas de asistente que un personaje también puede decir («—Aquí tienes.»).
+# Dentro de un parlamento se ignoran.
+_PATRONES_CONVERSACIONALES = {
+    r"aqu[ií] tienes",
+    r"claro, aqu[ií]",
+    r"si quieres,? puedo",
+    r"puedo ayudarte",
+    r"espero que (?:te|le) (?:guste|sirva)",
+}
+
+
+def _en_parlamento(texto: str, posicion: int) -> bool:
+    inicio = texto.rfind("\n", 0, posicion) + 1
+    linea = texto[inicio:posicion]
+    return linea.lstrip().startswith("—") and linea.count("—") % 2 == 1
 
 
 @registrar
@@ -411,8 +430,11 @@ class ResiduosDeBorrador:
                 compilado = re.compile(patron, re.IGNORECASE | re.UNICODE)
             except re.error:
                 continue
+            conversacional = patron in _PATRONES_CONVERSACIONALES
             for match in compilado.finditer(texto):
                 if match.start() in vistos or match.end() == match.start():
+                    continue
+                if conversacional and _en_parlamento(texto, match.start()):
                     continue
                 vistos.add(match.start())
                 hallazgo = crear_hallazgo(

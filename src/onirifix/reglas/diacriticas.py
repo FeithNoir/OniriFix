@@ -41,6 +41,33 @@ _INTERROGATIVOS = {
 }
 
 
+_CONJUGADO = re.compile(
+    r"\b[a-záéíóúñ]{2,}(?:ría|rían|rá|rán|aba|aban|ía|ían|ó|aron|ieron|es|en|a)\b",
+    re.UNICODE,
+)
+_INFINITIVO_O_GERUNDIO = re.compile(r"(?:ar|er|ir|ír|ando|iendo)(?:se|lo|la|le|los|las|les)?$")
+_FIN_DE_CLAUSULA = re.compile(r"[.;:!?…\n]|,\s+(?:pero|y|aunque|porque)\b")
+
+
+def _sigue_verbo_conjugado(texto: str, desde: int, palabras: int = 8) -> bool:
+    """¿Hay un verbo conjugado en las próximas palabras de la misma cláusula?"""
+
+    tramo = texto[desde : desde + 160]
+    corte = _FIN_DE_CLAUSULA.search(tramo)
+    if corte:
+        tramo = tramo[: corte.start()]
+    for palabra in tramo.split()[:palabras]:
+        palabra = palabra.strip(",«»\"“”()").casefold()
+        if (
+            len(palabra) > 3
+            and _CONJUGADO.fullmatch(palabra)
+            and not _INFINITIVO_O_GERUNDIO.search(palabra)
+            and palabra.endswith(("ría", "rían", "rá", "rán", "aba", "aban", "ía", "ían", "ó", "aron", "ieron"))
+        ):
+            return True
+    return False
+
+
 @registrar
 class TildesDiacriticas:
     id = "TIL-005"
@@ -63,7 +90,7 @@ class TildesDiacriticas:
     _si_afirmativo = re.compile(_INICIO + r"(?P<palabra>[Ss]i)(?=[ \t]*[,.!…]|[ \t]+—)", re.UNICODE)
     _el_pronombre = re.compile(
         r"(?<![^\W\d_])(?P<palabra>[Ee]l)(?=[ \t]+(?:ya|también|tampoco|nunca|siempre|no|"
-        r"solo|sí|mismo[ \t]+se)\b|[ \t]*[,.;:!?…](?![\w])|[ \t]+(?:para|y|con|sin|por)[ \t]+"
+        r"solo|sí|mismo[ \t]+se)\b|[ \t]*[,;:!?](?![\w])|[ \t]*\.(?![.\w])|[ \t]+(?:para|y|con|sin|por)[ \t]+"
         r"(?:[a-záéíóúñ]+(?:ar|er|ir|ír)(?:lo|la|le|los|las|les|se)?|que)\b)",
         re.UNICODE,
     )
@@ -74,7 +101,7 @@ class TildesDiacriticas:
     )
     _indirecta = re.compile(
         r"\b(?:no[ \t]+sé|no[ \t]+sabía|no[ \t]+sabe|no[ \t]+saben|no[ \t]+sabes|"
-        r"se[ \t]+preguntó|se[ \t]+preguntaba|preguntó|preguntaba|sin[ \t]+saber)[ \t]+"
+        r"no[ \t]+se|se[ \t]+preguntó|se[ \t]+preguntaba|preguntó|preguntaba|sin[ \t]+saber)[ \t]+"
         r"(?P<palabra>cuanto|cuanta|cuantos|cuantas|donde|como|cuando|quien|quienes|cual)\b",
         re.IGNORECASE | re.UNICODE,
     )
@@ -107,6 +134,11 @@ class TildesDiacriticas:
             )
         for match in self._que_infinitivo.finditer(texto):
             palabra = match.group("palabra")
+            # «Sé que modernizar el puerto nos traería…»: si la oración sigue
+            # con un verbo conjugado, el infinitivo es sujeto y «que» es
+            # conjunción, sin tilde.
+            if _sigue_verbo_conjugado(texto, match.end("siguiente")):
+                continue
             casos.append(
                 (match.start("palabra"), match.end("palabra"),
                  preservar_caso(palabra, _INTERROGATIVOS[palabra.casefold()]), 0.86,

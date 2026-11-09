@@ -34,11 +34,27 @@ class CorreccionesExplicitas:
         }
         if not mapa:
             return
-        patron = re.compile(
-            r"\b(?:" + "|".join(re.escape(k) for k in sorted(mapa, key=len, reverse=True)) + r")\b",
-            flags=re.IGNORECASE | re.UNICODE,
+        # Las claves de una o dos letras («d» → «de») solo se buscan en
+        # minúscula y sin apóstrofo ni punto detrás: «Rango D», «D'Artagnan»
+        # o una inicial «D.» no son errores.
+        largas = sorted((k for k in mapa if len(k) > 2), key=len, reverse=True)
+        cortas = sorted((k for k in mapa if len(k) <= 2), key=len, reverse=True)
+        patrones = []
+        if largas:
+            patrones.append(re.compile(
+                r"\b(?:" + "|".join(re.escape(k) for k in largas) + r")\b",
+                flags=re.IGNORECASE | re.UNICODE,
+            ))
+        if cortas:
+            patrones.append(re.compile(
+                r"(?<![^\W\d_]['’.]?)\b(?:" + "|".join(re.escape(k) for k in cortas)
+                + r")\b(?!['’.\-][^\W\d_]|\.)",
+                flags=re.UNICODE,
+            ))
+        coincidencias = sorted(
+            (m for p in patrones for m in p.finditer(texto)), key=lambda m: m.start()
         )
-        for match in patron.finditer(texto):
+        for match in coincidencias:
             original = match.group(0)
             reemplazo = mapa.get(original.casefold())
             if not reemplazo:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import importlib.util
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +21,7 @@ from onirifix.config import Configuracion, Settings, cargar_settings
 from onirifix.db.importador import escribir_yaml, exportar_yaml, importar_yaml
 from onirifix.db.repositorios import Registro
 from onirifix.informes import escribir_informes
+from onirifix.informes.pdf import ErrorExportacionPdf
 from onirifix.informes.terminal import (
     mostrar_aviso,
     mostrar_correccion,
@@ -53,7 +55,7 @@ def manejar_errores(func: Callable[..., Any]) -> Callable[..., Any]:
             return func(*args, **kwargs)
         except click.ClickException:
             raise
-        except (ValueError, OSError, UnicodeError, ErrorLectura) as exc:
+        except (ValueError, OSError, UnicodeError, ErrorLectura, ErrorExportacionPdf) as exc:
             raise click.ClickException(str(exc)) from exc
 
     return wrapper
@@ -84,6 +86,7 @@ def _escribir(
     salida: Path | None,
     formato: str,
     correccion: ResultadoCorreccion | None = None,
+    segundos: float | None = None,
 ) -> dict[str, Path]:
     return escribir_informes(
         resultado,
@@ -91,6 +94,7 @@ def _escribir(
         formatos=formato,
         correccion=correccion,
         max_por_regla=_max_por_regla(config),
+        segundos=segundos,
     )
 
 
@@ -231,12 +235,14 @@ def analizar_cmd(
 
     settings = _settings(obj)
     with abrir_contexto(settings) as ctx:
+        inicio = time.perf_counter()
         resultado = analizar(
             ctx,
             archivo,
             solo_reglas=_lista_ids(reglas),
             incluir_l3=not sin_l3,
         )
+        segundos = time.perf_counter() - inicio
         rutas: dict[str, Path] = {}
         if not sin_informes:
             rutas = _escribir(
@@ -245,8 +251,9 @@ def analizar_cmd(
                 resultado,
                 salida=salida,
                 formato=formato,
+                segundos=segundos,
             )
-        mostrar_resultado(resultado, obra=ctx.obra.slug, rutas=rutas)
+        mostrar_resultado(resultado, obra=ctx.obra.slug, rutas=rutas, segundos=segundos)
     if estricto and any(
         hallazgo.nivel in {Nivel.L1, Nivel.L2} for hallazgo in resultado.hallazgos
     ):
@@ -264,12 +271,23 @@ def analizar_cmd(
 )
 @click.option("--aplicar", is_flag=True, help="Escribe los cambios (por defecto dry-run).")
 @click.option("--aplicar-l2", is_flag=True, help="Permite aplicar hallazgos L2.")
+@click.option(
+    "--l2-seguras",
+    is_flag=True,
+    help="Aplica también las L2 de la lista `l2_seguras` que alcanzan su umbral.",
+)
 @click.option("--umbral", type=click.FloatRange(0.0, 1.0), default=None, help="Confianza mínima L2.")
 @click.option("--backup/--sin-backup", "backup", default=None, help="Copia de seguridad antes de escribir.")
 @click.option("--destino", type=click.Path(dir_okay=False, path_type=Path), default=None)
 @click.option("--salida", "-s", type=click.Path(file_okay=False, path_type=Path), default=None)
 @click.option("--sin-informes", is_flag=True)
-@click.option("--formato", "-f", default="md,csv,json,diff", show_default=True)
+@click.option(
+    "--formato",
+    "-f",
+    default="md,csv,json,diff",
+    show_default=True,
+    help="Añade `pdf` para el informe PDF y el manuscrito corregido en PDF.",
+)
 @click.pass_obj
 @manejar_errores
 def corregir_cmd(
@@ -278,6 +296,7 @@ def corregir_cmd(
     nivel: str,
     aplicar: bool,
     aplicar_l2: bool,
+    l2_seguras: bool,
     umbral: float | None,
     backup: bool | None,
     destino: Path | None,
@@ -299,6 +318,9 @@ def corregir_cmd(
     backup_final = settings.backup if backup is None else backup
 
     with abrir_contexto(settings) as ctx:
+        inicio = time.perf_counter()
+        analisis = analizar(ctx, archivo, incluir_l3=True)
+        segundos = time.perf_counter() - inicio
         correccion = corregir(
             ctx,
             archivo,
@@ -308,6 +330,8 @@ def corregir_cmd(
             umbral_l2=umbral_final,
             backup=backup_final,
             destino=destino,
+            l2_seguras=l2_seguras,
+            analisis=analisis,
         )
         rutas: dict[str, Path] = {}
         if not sin_informes:
@@ -318,11 +342,13 @@ def corregir_cmd(
                 salida=salida,
                 formato=formato,
                 correccion=correccion,
+                segundos=segundos,
             )
         mostrar_resultado(
             correccion.analisis,
             obra=ctx.obra.slug,
             rutas=rutas,
+            segundos=segundos,
         )
         mostrar_correccion(correccion)
 

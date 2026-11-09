@@ -13,6 +13,21 @@ idioma: es
 # Umbral mínimo de confianza para aplicar hallazgos L2.
 umbral_l2: 0.90
 
+# L2 «seguras»: reglas L2 cuya precisión se verificó en un manuscrito real.
+# `onirifix corregir --l2-seguras` y el botón «Aceptar L2 seguras» de la
+# interfaz las aplican cuando su confianza llega al umbral de cada una; el
+# resto de L2 queda pendiente de revisión.
+l2_seguras:
+  DIA-006: 0.92
+  DIA-007: 0.88
+  TIL-001: 0.88
+  TIL-003: 0.88
+  TIL-004: 0.92
+  TIL-005: 0.86
+  TIL-006: 0.9
+  ORT-001: 0.82
+  ORT-004: 0.86
+
 # Copia de seguridad antes de modificar un archivo y auditoría en SQLite.
 backup: true
 auditoria: true
@@ -41,7 +56,7 @@ reglas:
   TIP-009: true
   TIP-010: false
   DIA-001: true
-  DIA-002: true
+  DIA-002: false  # choca con DIA-007: «—dijo Ana—. El mar…» mantiene la mayúscula
   DIA-003: false
   DIA-004: true
   DIA-005: true
@@ -61,7 +76,7 @@ reglas:
   TIP-011: true
   TIP-012: true
   TIP-013: true
-  TIP-014: true
+  TIP-014: false  # “…” puede marcar pensamientos; actívala si la obra no las usa
   TIP-015: true
   DIA-006: true
   DIA-007: true
@@ -309,19 +324,14 @@ residuo_ia:
   frases:
     - en el vasto tapiz
     - un testimonio de
-    - no solo
-    - en resumen
     - es importante destacar
     - en conclusión
     - como si el tiempo se detuviera
     - un torbellino de emociones
     - en la encrucijada de
     - una sinfonía de
-    - el eco de
     - una danza de
-    - en el corazón de
     - un recordatorio de que
     - un viaje de autodescubrimiento
     - con cada fibra de su ser
-    - el peso de
     - la esencia misma de

@@ -25,8 +25,9 @@ En Windows, el instalador añade **OniriFix (ventana)** al menú Inicio
 
 El recorrido es siempre el mismo:
 
-1. **Abre** un `.md`, `.txt` o `.docx`. El análisis empieza solo y **no toca**
-   el archivo.
+1. **Abre** un `.md`, `.txt`, `.docx` o `.pdf`. El análisis empieza solo y
+   **no toca** el archivo. Una barra muestra la regla en curso («Regla TIL-002 ·
+   23 de 39») y **Cancelar (Esc)** lo detiene sin cambiar nada.
 2. **Elige reglas y niveles** en el panel izquierdo (L1, L2, L3 o reglas
    sueltas) y vuelve a analizar con `F5`.
 3. **Revisa** en la tabla. Filtra por nivel, regla, capítulo, estado o texto.
@@ -34,11 +35,23 @@ El recorrido es siempre el mismo:
 4. **Decide**: los L1 llegan aceptados, los L2 pendientes y los L3 son solo
    avisos de lectura (no se pueden aplicar). Acepta o rechaza uno a uno
    (teclas `A` y `R` en la tabla), con las casillas, o en bloque con
-   **Aceptar visibles** / **Rechazar visibles**.
-5. **Aplica los cambios**. Antes de escribir se guarda una copia con marca de
-   tiempo y cada cambio queda en la auditoría. Después se vuelve a analizar el
-   texto corregido.
-6. **Exporta el informe** (Markdown, CSV, JSON y el diff de lo aplicado).
+   **Aceptar visibles** / **Rechazar visibles**, **Aceptar regla** (todos los
+   pendientes de la regla activa, `Ctrl+Shift+A`) y **Aceptar L2 seguras**
+   (`Ctrl+L`, las L2 de la lista `l2_seguras` que llegan a su umbral).
+5. **Mira el hallazgo en su sitio**: doble clic o `Ctrl+T` abre la pestaña
+   **Texto completo** con el fragmento resaltado; el selector **Ir a** salta
+   al inicio de cada capítulo.
+6. **Aplica los cambios**. Antes de escribir se guarda una copia con marca de
+   tiempo y cada cambio queda en la auditoría. Un `.docx` o `.pdf` nunca se
+   reescribe: el texto corregido va a un `.corregido.md` al lado. Después se
+   vuelve a analizar el texto corregido.
+7. **Exporta el informe** (Markdown, CSV, JSON, **PDF** y el diff de lo
+   aplicado). Si hubo cambios, también sale el **manuscrito corregido en PDF**.
+
+Atajos: `Ctrl+O` abrir, `F5` analizar, `Ctrl+F` buscar, `Ctrl+Shift+F` limpiar
+filtros, `Ctrl+T` hallazgos/texto, `Ctrl+S` aplicar, `Ctrl+E` exportar, `Esc`
+cancelar el análisis. La ventana recuerda el último manuscrito, los filtros y
+las secciones plegadas.
 
 Mientras analiza, aplica o exporta, una capa de espera bloquea el resto de
 acciones para que nada se pise. Las secciones laterales se pliegan y la ventana
@@ -63,6 +76,57 @@ recuerda su tamaño y el último manuscrito.
 El resto (inicio, capa de espera, inspector) está en
 [`docs/screenshots/`](docs/screenshots/). Las capturas salen de la ventana real
 con un relato inventado: `python scripts/capture_gui_screenshots.py`.
+
+## Prueba de fuego: un manuscrito real
+
+Antes de publicar la interfaz, OniriFix se probó con el primer libro completo
+de una novela en curso: un PDF de 741 páginas, unas 223 000 palabras, 21
+capítulos y un epílogo. El manuscrito no está en el repositorio; estas
+capturas son de la ventana real trabajando sobre él
+(`scripts/capturar_prueba_fuego.py --manuscrito …`).
+
+| Paso | Antes | Después |
+|---|---|---|
+| Análisis completo (CLI) | 138,7 s | **3,7–3,9 s** (1,9 s de extracción del PDF) |
+| Bloqueo máximo de la interfaz durante el análisis | — (2 min con spinner) | **≤ 75 ms** |
+| Filtrar 2 500 hallazgos por nivel o regla | — | 55–75 ms |
+| Abrir el texto completo (1,4 MB) y saltar a un hallazgo | — | 96 ms la primera vez, 7 ms cada salto |
+| Aplicar 2 358 cambios y volver a analizar | — | 2,3 s |
+| Exportar informe y manuscrito en PDF (23 + 865 páginas) | — | 2,5 s |
+| Hallazgos (L1 / L2 / L3) | 1 306 / 1 368 / 160 | 1 320 / 1 132 / 64 |
+
+El cuello de botella era `TIL-001`, que buscaba la palabra anterior con una
+expresión regular sobre todo el texto previo (coste cuadrático): pasó de 135 s
+a 0,03 s. El resto de la bajada de hallazgos es ruido eliminado tras revisar
+muestras de cada regla a mano (falsos positivos en diálogo, siglas, pronombres
+y adjetivos). Con `corregir --l2-seguras` se aplicaron los 1 320 L1 y 1 038 de
+las 1 132 L2; quedan 94 L2 y 64 avisos L3 para el autor, todos listados en el
+informe PDF.
+
+### Abrir y analizar
+
+![Manuscrito real abierto, aún sin analizar](docs/screenshots/16-prueba-fuego-abrir.png)
+
+![Análisis en curso con la regla actual, el avance y el botón Cancelar](docs/screenshots/17-prueba-fuego-analizando.png)
+
+### Revisar un hallazgo y verlo en el texto
+
+![Atribución de diálogo suelta (DIA-006) en el inspector con el antes y el después](docs/screenshots/19-prueba-fuego-hallazgo.png)
+
+![Pestaña Texto completo con el hallazgo resaltado en su sitio](docs/screenshots/20-prueba-fuego-texto-completo.png)
+
+### Estadísticas, L2 seguras y aplicar
+
+![Estadísticas de las L2 pendientes por regla y capítulo](docs/screenshots/21-prueba-fuego-estadisticas.png)
+
+![Después de aplicar: el PDF queda intacto y el texto corregido se vuelve a analizar](docs/screenshots/23-prueba-fuego-aplicado.png)
+
+### Informe en PDF
+
+![Primera página del informe PDF: resumen por nivel y por regla](docs/screenshots/25-prueba-fuego-informe-pdf.png)
+
+Más capturas del recorrido (18, 22 y 24) en
+[`docs/screenshots/`](docs/screenshots/).
 
 ## Capturas de la consola
 
@@ -158,7 +222,14 @@ El portable escribe en el directorio actual salvo que se defina
   que se pida `--aplicar`.
 - Copias de seguridad con marca de tiempo antes de escribir.
 - Auditoría de cambios en SQLite.
-- Informes Markdown, CSV, JSON y diff.
+- Lee `.md`, `.txt`, `.docx` y `.pdf` (texto extraíble: Word exportado a PDF,
+  por ejemplo). Del PDF reconstruye párrafos y capítulos y quita números de
+  página, cabeceras repetidas y guiones de corte de línea.
+- Informes Markdown, CSV, JSON, diff y **PDF** (resumen por nivel, regla y
+  capítulo, pendientes con contexto y avisos L3), más el **manuscrito
+  corregido en PDF**.
+- **L2 seguras**: lista configurable de reglas L2 verificadas que se pueden
+  aplicar en bloque, cada una con su umbral.
 - Interfaz de escritorio opcional (PySide6) para revisar, aceptar o rechazar
   hallazgos y aplicar con copia de seguridad.
 - Reglas enchufables y descubrimiento automático.
@@ -190,8 +261,28 @@ Dependencias opcionales:
 pip install -e ".[nlp]"        # spaCy (requiere descargar un modelo)
 pip install -e ".[ortografia]" # spylls + diccionario Hunspell
 pip install -e ".[docx]"       # lectura de .docx
-pip install -e ".[gui]"        # interfaz de escritorio (PySide6)
+pip install -e ".[pdf]"        # leer PDF sin poppler y exportar a PDF (pdfminer.six, reportlab)
+pip install -e ".[gui]"        # interfaz de escritorio (PySide6, incluye [pdf])
 ```
+
+Para leer PDF, OniriFix usa `pdftotext` (poppler) si está en el `PATH`, que es
+unas ocho veces más rápido, y si no `pdfminer.six`. El PDF tiene que tener
+texto: un escaneo sin OCR no sirve.
+
+## Manuscrito en PDF
+
+```bash
+# Analizar el PDF tal cual (no se modifica).
+onirifix analizar libro.pdf --formato md,csv,json,pdf
+
+# Aplicar L1 + las L2 seguras y exportar el informe y el manuscrito en PDF.
+# El texto corregido se escribe en libro.corregido.md; el PDF original no se toca.
+onirifix corregir libro.pdf --l2-seguras --aplicar --formato md,csv,json,diff,pdf
+```
+
+Salen `informe.pdf` (resumen por nivel, regla y capítulo, pendientes con su
+contexto, avisos L3 y una muestra de lo aplicado) y `manuscrito-corregido.pdf`
+(un capítulo por página).
 
 ## Inicio rápido
 
@@ -232,18 +323,22 @@ automáticamente la primera vez que se usa.
 | Nivel | Qué hace | Se aplica con |
 | :--- | :--- | :--- |
 | L1 | Correcciones mecánicas de alta confianza | `--aplicar` (por defecto) |
-| L2 | Propuestas que requieren contexto | `--aplicar-l2 --umbral 0.9` |
+| L2 | Propuestas que requieren contexto | `--aplicar-l2 --umbral 0.9`, o solo las verificadas con `--l2-seguras` |
 | L3 | Solo informe | Nunca |
 
 `corregir` es dry-run por defecto. Para escribir hay que añadir `--aplicar`.
-Los cambios L2 requieren, además, `--aplicar-l2` y respetar el umbral.
+Los cambios L2 requieren, además, `--aplicar-l2` y respetar el umbral, o
+`--l2-seguras`, que aplica solo las reglas de la lista `l2_seguras` de la
+configuración (cada una con su umbral, por ejemplo `DIA-006: 0.92`). Esa lista
+sale de revisar a mano muestras de un manuscrito real; lo demás queda pendiente
+en el informe.
 
 ## Comandos principales
 
 ```bash
 onirifix init
 onirifix analizar ARCHIVO [--salida DIR] [--formato md,csv,json] [--estricto]
-onirifix corregir ARCHIVO [--aplicar] [--aplicar-l2] [--umbral 0.9]
+onirifix corregir ARCHIVO [--aplicar] [--aplicar-l2] [--umbral 0.9] [--l2-seguras]
 onirifix revisar ARCHIVO
 onirifix frecuencia ARCHIVO
 onirifix duplicados ARCHIVO

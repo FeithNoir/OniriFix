@@ -41,6 +41,13 @@ manuscripts/
 privado/
 correcciones*.txt
 informe-*.md
+informe.md
+hallazgos.csv
+hallazgos.json
+parches.diff
+*.corregido.md
+*.corregido.txt
+*.bak
 !examples/*.md
 
 # ---------------------------------------------------------------------------

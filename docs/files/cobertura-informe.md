@@ -23,8 +23,8 @@ sola, qué propone para que tú decidas y qué queda en tus manos**.
 | :--- | :--- | :--- | :--- | :--- |
 | Verbo de habla en mayúscula tras el cierre | `—Basta. —Dijo Ana.` | `DIA-001` | L1 | Automático |
 | Verbo de habla como oración suelta, sin raya (misma línea o siguiente) | `—¿Vienes? Preguntó Ana.` | `DIA-006` | L2 | Asistido |
-| Inciso sin cerrar antes de una nueva pregunta o exclamación | `—Vale —dijo Ana. ¿Vienes?` | `DIA-007` | L2 | Asistido |
-| Reanudación del parlamento en mayúscula | `—… —dijo Ana. —Las llaves…` | `DIA-002` | L2 | Asistido |
+| Inciso sin cerrar antes de una nueva pregunta, exclamación o raya | `—Vale —dijo Ana. ¿Vienes?` · `—Vale —dijo Ana, seria. —Vamos.` | `DIA-007` | L2 | Asistido |
+| Reanudación del parlamento en mayúscula | `—… —dijo Ana. —Las llaves…` | `DIA-007` (cierra el inciso y deja la mayúscula); `DIA-002` es opt-in | L2 | Asistido |
 | Espacios que faltan junto a la raya | `Hola—dijo Ana.` | `DIA-004`, `DIA-005` | L1 | Automático |
 | Diálogo que abre con guion simple | `-Ya voy.` | `TIP-007` | L1 | Automático |
 | Saber quién habla en escenas de tres voces, reescribir incisos complejos | — | — | — | **Manual** |
@@ -119,11 +119,32 @@ interioridad.
 - **Automático (L1):** `DIA-001`, `DIA-004`, `DIA-005`, `TIP-001`–`TIP-005`,
   `TIP-007`–`TIP-009`, `TIP-011`, `TIP-012`, `TIP-015` y los pretéritos
   inequívocos de `TIL-003`.
-- **Asistido (L2):** `DIA-002`, `DIA-006`, `DIA-007`, `TIL-001`, `TIL-003`
-  (ambiguos), `TIL-004`, `TIL-005`, `TIL-006`, `TIP-014`, `ORT-001`–`ORT-004`,
-  `REP-005`, `CON-001`, `CON-002`.
+- **Asistido (L2):** `DIA-006`, `DIA-007`, `TIL-001`, `TIL-003`
+  (ambiguos), `TIL-004`, `TIL-005`, `TIL-006`, `ORT-001`–`ORT-004`,
+  `REP-005`, `CON-001`, `CON-002`; opt-in: `DIA-002`, `TIP-014`.
+- **L2 seguras** (se aplican con `--l2-seguras` o **Aceptar L2 seguras**):
+  `DIA-006` ≥ 0.92, `DIA-007` ≥ 0.88, `TIL-001` ≥ 0.88, `TIL-003` ≥ 0.88,
+  `TIL-004` ≥ 0.92, `TIL-005` ≥ 0.86, `TIL-006` ≥ 0.90, `ORT-001` ≥ 0.82,
+  `ORT-004` ≥ 0.86.
 - **Señalado (L3):** `TIP-013`, `REP-001`–`REP-004`, `REP-006`.
 - **Manual:** punto de vista, continuidad, `Por qué/Porque`, `Tu/Tú` y demás
   diacríticas dependientes del sentido, concordancias, participios mal
   formados, palabras omitidas, elegir entre versiones duplicadas, poda de
   muletillas, política de anacronismos y gritos en mayúsculas.
+
+## Resultado en el manuscrito completo
+
+Prueba de fuego con el primer libro (PDF de 741 páginas, ~223 000 palabras):
+
+| | Hallazgos | Aplicados con `--l2-seguras` | Pendientes |
+| :--- | ---: | ---: | ---: |
+| L1 | 1 320 | 1 320 | 0 |
+| L2 | 1 132 | 1 038 | 94 |
+| L3 | 64 | — | 64 |
+
+Lo más frecuente fue el defecto n.º 1 del informe: 1 042 verbos de habla
+sueltos (`DIA-006`), de los que 989 eran verbos inequívocos (`Dijo`,
+`Respondió`, `Preguntó`…) y se aplicaron; los 53 con verbos que también narran
+(`Soltó`, `Siguió`, `Concluyó`…) quedan para revisar. Le siguen 855 puntos
+suspensivos de tres puntos (`TIP-004`) y 385 pares de comillas rectas
+(`TIP-005`).

@@ -157,3 +157,93 @@ def test_comando_gui_registrado() -> None:
     resultado = CliRunner().invoke(cli, ["gui", "--help"])
     assert resultado.exit_code == 0
     assert "interfaz de escritorio" in resultado.output
+
+
+# ---------------------------------------------------------------------------
+# Prueba de fuego: progreso, cancelar, texto completo, L2 seguras, PDF
+# ---------------------------------------------------------------------------
+
+TEXTO_LARGO = (
+    "# Capítulo 1\n\n"
+    "—¿Subimos al faro?\n\nPreguntó Lina sin soltar el farol.\n\n"
+    "Tomás miró hacía arriba... La escalera crujía.\n\n"
+    "# Capítulo 2\n\n"
+    "—Aquí arriba no hay nadie.\n\nRespondió Tomás.\n"
+)
+
+
+def test_progreso_y_texto_completo(ventana, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    manuscrito = tmp_path / "faro.md"
+    manuscrito.write_text(TEXTO_LARGO, encoding="utf-8")
+    avances: list[tuple[int, int, str]] = []
+    from onirifix.gui import ventana as modulo
+
+    original = modulo.VentanaPrincipal._avance
+
+    def espiar(self, hechas, total, detalle):  # type: ignore[no-untyped-def]
+        avances.append((hechas, total, detalle))
+        original(self, hechas, total, detalle)
+
+    modulo.VentanaPrincipal._avance = espiar  # type: ignore[method-assign]
+    try:
+        ventana.abrir_manuscrito(manuscrito)
+        _esperar(ventana)
+    finally:
+        modulo.VentanaPrincipal._avance = original  # type: ignore[method-assign]
+    assert ventana.sesion is not None and len(ventana.sesion) > 0
+    assert any(total > 0 and "Regla" in detalle for _h, total, detalle in avances)
+    assert ventana.segundos_analisis is not None
+
+    ventana.ver_en_texto()
+    assert ventana.pestanas.currentWidget() is ventana.vista_texto
+    seleccion = ventana.vista_texto.editor.extraSelections()
+    assert len(seleccion) == 1
+    hallazgo = ventana.sesion.hallazgos[ventana.tabla.indice_actual()]
+    assert seleccion[0].cursor.selectedText().replace("\u2029", "\n") == hallazgo.original
+    assert ventana.vista_texto.capitulos.count() == 2
+    ventana.alternar_vista()
+    assert ventana.pestanas.currentIndex() == 0
+
+
+def test_aceptar_l2_seguras_y_exportar_pdf(ventana, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    pytest.importorskip("reportlab")
+    manuscrito = tmp_path / "faro.md"
+    manuscrito.write_text(TEXTO_LARGO, encoding="utf-8")
+    ventana.abrir_manuscrito(manuscrito)
+    _esperar(ventana)
+    aceptadas = ventana.aceptar_l2_seguras()
+    assert aceptadas >= 2  # DIA-006 (x2) y TIL-001
+    ventana.aplicar_cambios(confirmar=False)
+    _esperar(ventana)
+    corregido = manuscrito.read_text(encoding="utf-8")
+    assert "—¿Subimos al faro? —preguntó Lina" in corregido
+    assert "hacia arriba…" in corregido
+    ventana.exportar_informe(tmp_path / "informe")
+    _esperar(ventana)
+    assert (tmp_path / "informe" / "informe.pdf").exists()
+    assert (tmp_path / "informe" / "manuscrito-corregido.pdf").exists()
+
+
+def test_cancelar_analisis_no_cambia_nada(ventana, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    manuscrito = tmp_path / "faro.md"
+    manuscrito.write_text(TEXTO_LARGO * 200, encoding="utf-8")
+    ventana.archivo = manuscrito
+    ventana.analizar()
+    ventana.cancelar_analisis()
+    _esperar(ventana)
+    assert ventana.sesion is None
+    assert "cancelado" in ventana.etiqueta_estado.text().lower() or ventana.resultado is not None
+
+
+def test_filtros_se_recuerdan(ventana, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    manuscrito = tmp_path / "faro.md"
+    manuscrito.write_text(TEXTO_LARGO, encoding="utf-8")
+    ventana.abrir_manuscrito(manuscrito)
+    _esperar(ventana)
+    ventana.filtros.fijar(nivel="L2")
+    assert ventana.preferencias.value("filtros/nivel") == "L2"
+    ventana.filtros.limpiar()
+    ventana.preferencias.setValue("filtros/nivel", "L2")
+    ventana.analizar()
+    _esperar(ventana)
+    assert ventana.filtros.filtro().nivel == "L2"

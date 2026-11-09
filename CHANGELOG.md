@@ -6,6 +6,43 @@ Todas las novedades relevantes de OniriFix se documentan aquí. El formato sigue
 
 ## [Sin publicar]
 
+### Prueba de fuego con un manuscrito real
+
+Primer libro completo de una novela (PDF de 741 páginas, ~223 000 palabras).
+
+- **Rendimiento**: el análisis bajó de 138,7 s a 3,7–3,9 s. `TIL-001` buscaba
+  la palabra anterior con una regex sobre todo el texto previo (cuadrático):
+  135 s → 0,03 s. También se acotaron `oracion_alrededor`, el `endswith` de
+  `DIA-006` y el cálculo de línea y columna (bisect sobre saltos cacheados).
+- **Entrada PDF** (`.pdf`): `pdftotext -bbox-layout` si hay poppler y
+  `pdfminer.six` si no. Reconstruye párrafos, une los que cruzan de página,
+  quita números de página, cabeceras repetidas y guiones de corte, y detecta
+  capítulos con un patrón estricto (`Parte de la tripulación…` ya no es un
+  capítulo). El PDF nunca se reescribe: el texto corregido va a
+  `*.corregido.md`.
+- **Salida PDF**: `informe.pdf` (resumen por nivel, regla y capítulo,
+  pendientes con contexto, avisos L3, muestra de lo aplicado) y
+  `manuscrito-corregido.pdf`. Formato `pdf` en `--formato` y en la interfaz.
+- **L2 seguras** (`l2_seguras` en la configuración, `corregir --l2-seguras`,
+  botón **Aceptar L2 seguras**): solo las L2 verificadas a mano, cada una con
+  su umbral.
+- **Interfaz**: progreso por regla con **Cancelar (Esc)**, pestaña **Texto
+  completo** con el hallazgo resaltado y salto a capítulo, **Aceptar regla**,
+  filtros recordados, estado vacío de filtros, atajos `Ctrl+F`, `Ctrl+T`,
+  `Ctrl+L`, `Ctrl+Shift+A`, `Ctrl+Shift+F`, y tiempo de análisis en la
+  cabecera y en el informe.
+- **Reglas afinadas** tras revisar muestras a mano: `TIL-001` (negación +
+  determinante), `TIL-003` (determinante en mayúscula, verbo delante, sin
+  `bajo`/`trono`/`vacío`), `TIL-004` (posesivo detrás), `TIL-005` (`el…`, `que`
+  + infinitivo sujeto, `no se cuanto`), `ORT-001` (claves cortas), `REP-006`
+  (fórmulas dentro de diálogo, `TODO` gritado), `REP-003` (frases corrientes
+  fuera), `DIA-003` (conserva `?`, `!` y `…`), `DIA-006` (confianza por tipo de
+  verbo), `DIA-007` (cierra el inciso ante una raya nueva), `DIA-001` (respeta
+  `rae_estricto`).
+- `TIP-014` y `DIA-002` pasan a opt-in.
+- La tabla de la consola muestra «L1 · Mecánico…» en vez de «L1 · L1».
+- Capturas reales `16`–`25` en `docs/screenshots`.
+
 ### Añadido
 
 - **Interfaz de escritorio** (PySide6, extra `[gui]`) con el estilo oscuro de

@@ -133,13 +133,20 @@ _VERBOS_DE_MOVIMIENTO = {
 }
 
 
+_PALABRA_FINAL = re.compile(r"([^\W\d_]+)\s*$", re.UNICODE)
+_PALABRA_INICIAL = re.compile(r"\s*([^\W\d_]+)", re.UNICODE)
+# Ventana de contexto: buscar en todo el prefijo del libro hacía la regla
+# cuadrática (más de dos minutos en una novela de 220 000 palabras).
+_VENTANA = 80
+
+
 def _palabra_antes(texto: str, posicion: int) -> str:
-    coincidencia = re.search(r"([^\W\d_]+)\s*$", texto[:posicion], re.UNICODE)
+    coincidencia = _PALABRA_FINAL.search(texto, max(0, posicion - _VENTANA), posicion)
     return coincidencia.group(1).casefold() if coincidencia else ""
 
 
 def _palabra_despues(texto: str, posicion: int) -> str:
-    coincidencia = re.match(r"\s*([^\W\d_]+)", texto[posicion:], re.UNICODE)
+    coincidencia = _PALABRA_INICIAL.match(texto, posicion, posicion + _VENTANA)
     return coincidencia.group(1).casefold() if coincidencia else ""
 
 
@@ -278,6 +285,12 @@ class HaciaHacia:
                 elif pos in {"ADP", "ADV"}:
                     continue
 
+            # «pero no hacia la salida»: con determinante o destino detrás es
+            # la preposición aunque haya una negación delante.
+            if confianza == 0.0 and (
+                siguiente in _DETERMINANTES or siguiente in _DESTINOS_DE_HACIA
+            ):
+                continue
             if confianza == 0.0:
                 if siguiente in _SUSTANTIVOS_DE_HACER:
                     confianza = 0.84

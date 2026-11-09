@@ -208,7 +208,7 @@ def test_til_004_sustantivo_tras_determinante(texto: str, sugerencia: str) -> No
 
 
 def test_til_004_el_es_ambiguo_y_tiene_baja_confianza() -> None:
-    hallazgos = ejecutar_regla("TIL-004", "el terminó la carta")
+    hallazgos = ejecutar_regla("TIL-004", "el terminó fue abrupto")
     assert hallazgos[0].confianza < 0.9
     assert "él" in hallazgos[0].nota
     assert ejecutar_regla("TIL-004", "Él terminó la carta.") == []

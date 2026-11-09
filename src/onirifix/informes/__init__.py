@@ -15,7 +15,7 @@ from onirifix.informes.markdown import renderizar_markdown
 from onirifix.modelo import ResultadoAnalisis, ResultadoCorreccion
 from onirifix.nucleo.parches import crear_diff
 
-FORMATOS_CONOCIDOS: tuple[str, ...] = ("md", "csv", "json", "diff")
+FORMATOS_CONOCIDOS: tuple[str, ...] = ("md", "csv", "json", "diff", "pdf")
 FORMATOS_DEFECTO: frozenset[str] = frozenset({"md", "csv", "json"})
 
 NOMBRES: dict[str, str] = {
@@ -23,7 +23,23 @@ NOMBRES: dict[str, str] = {
     "csv": "hallazgos.csv",
     "json": "hallazgos.json",
     "diff": "parches.diff",
+    "pdf": "informe.pdf",
 }
+NOMBRE_MANUSCRITO_PDF = "manuscrito-corregido.pdf"
+
+
+def _titulo(documento) -> str:  # type: ignore[no-untyped-def]
+    """Primer párrafo corto antes del primer capítulo (el título de la obra) o el nombre."""
+
+    inicios = [c.inicio for c in documento.capitulos if c.inicio > 0]
+    primero = inicios[0] if inicios else len(documento.texto)
+    for parrafo in documento.texto[:primero].split("\n\n"):
+        parrafo = parrafo.strip()
+        if parrafo.startswith("#"):
+            break
+        if parrafo:
+            return parrafo if len(parrafo) <= 100 and "\n" not in parrafo else documento.ruta.stem
+    return documento.ruta.stem
 
 
 def normalizar_formatos(formatos: str | Iterable[str] | None) -> set[str]:
@@ -45,11 +61,13 @@ def escribir_informes(
     formatos: str | Iterable[str] | None = None,
     correccion: ResultadoCorreccion | None = None,
     max_por_regla: int = 300,
+    segundos: float | None = None,
 ) -> dict[str, Path]:
     """Escribe los informes pedidos y devuelve ``{formato: ruta}``.
 
     Los formatos desconocidos se ignoran. El diff solo se escribe si hay una
-    corrección con cambios.
+    corrección con cambios. Con ``pdf`` y una corrección con cambios también
+    se maqueta el manuscrito corregido (clave ``manuscrito_pdf``).
     """
 
     pedidos = [f for f in FORMATOS_CONOCIDOS if f in normalizar_formatos(formatos)]
@@ -85,12 +103,27 @@ def escribir_informes(
                 ),
                 encoding="utf-8",
             )
+        elif formato == "pdf":
+            from onirifix.informes.pdf import escribir_informe_pdf, escribir_manuscrito_pdf
+
+            escribir_informe_pdf(
+                resultado, ruta, correccion=correccion, max_por_regla=max_por_regla,
+                segundos=segundos,
+            )
+            if correccion is not None and correccion.aplicados:
+                rutas["manuscrito_pdf"] = escribir_manuscrito_pdf(
+                    correccion.texto_corregido,
+                    salida / NOMBRE_MANUSCRITO_PDF,
+                    titulo=_titulo(correccion.analisis.documento),
+                    subtitulo=f"Texto corregido con OniriFix · {len(correccion.aplicados)} cambios",
+                )
         rutas[formato] = ruta
     return rutas
 
 
 __all__ = [
     "FORMATOS_CONOCIDOS",
+    "NOMBRE_MANUSCRITO_PDF",
     "escribir_informes",
     "normalizar_formatos",
     "renderizar_markdown",

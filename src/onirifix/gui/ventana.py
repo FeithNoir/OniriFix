@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -37,18 +38,25 @@ from onirifix.gui.componentes.panel_estadisticas import PanelEstadisticas
 from onirifix.gui.componentes.panel_reglas import PanelReglas
 from onirifix.gui.componentes.plegable import SeccionPlegable
 from onirifix.gui.componentes.tabla_hallazgos import TablaHallazgos
-from onirifix.gui.revision import Estado, Resumen, SesionRevision
+from onirifix.gui.componentes.vista_texto import VistaTexto
+from onirifix.gui.revision import Estado, Filtro, Resumen, SesionRevision
 from onirifix.gui.tema import COLORES
 from onirifix.gui.trabajadores import TrabajadorAnalisis, TrabajadorAplicar, TrabajadorExportar
-from onirifix.io.cargadores import SUFIJOS_DOCX, SUFIJOS_TEXTO
-from onirifix.modelo import ResultadoAnalisis, ResultadoCorreccion
+from onirifix.io.cargadores import (
+    CODIFICACIONES_DERIVADAS,
+    SUFIJOS_DOCX,
+    SUFIJOS_PDF,
+    SUFIJOS_TEXTO,
+    destino_corregido,
+)
+from onirifix.modelo import Nivel, ResultadoAnalisis, ResultadoCorreccion
 from onirifix.servicio import catalogo_reglas
 
 log = logging.getLogger(__name__)
 
 FILTRO_ARCHIVOS = (
     "Manuscritos ("
-    + " ".join(f"*{sufijo}" for sufijo in sorted(SUFIJOS_TEXTO | SUFIJOS_DOCX))
+    + " ".join(f"*{sufijo}" for sufijo in sorted(SUFIJOS_TEXTO | SUFIJOS_DOCX | SUFIJOS_PDF))
     + ");;Todos los archivos (*)"
 )
 
@@ -113,6 +121,9 @@ class VentanaPrincipal(QMainWindow):
         self._modo_silencioso = False
         self._secciones: dict[str, SeccionPlegable] = {}
         self._botones_accion: list[QPushButton] = []
+        self.segundos_analisis: float | None = None
+        self._segundos_corregido: float | None = None
+        self._restaurando_filtros = False
         self.setWindowTitle("OniriFix")
         self.resize(1440, 920)
         self.setMinimumSize(1180, 720)
@@ -153,12 +164,69 @@ class VentanaPrincipal(QMainWindow):
             self._error("Elige al menos una regla (y su nivel) para analizar.")
             return
         trabajador = TrabajadorAnalisis(self._settings_activos(), self.archivo, reglas)
-        trabajador.terminado.connect(self._analisis_terminado)
+        trabajador.terminado.connect(
+            lambda resultado, t=trabajador: self._analisis_terminado(resultado, t.segundos)
+        )
+        trabajador.avance.connect(self._avance)
+        trabajador.cancelado.connect(self._analisis_cancelado)
         self._lanzar(
             trabajador,
             "Analizando manuscrito…",
             f"{self.archivo.name} · {len(reglas)} reglas. No se modifica nada.",
+            cancelable=True,
         )
+
+    def cancelar_analisis(self) -> None:
+        if isinstance(self._trabajador, TrabajadorAnalisis) and self._trabajador.isRunning():
+            self._trabajador.cancelar()
+            self.capa.boton_cancelar.setEnabled(False)
+            self.capa.progreso_en(0, 0, "Cancelando al terminar la regla en curso…")
+
+    def aceptar_l2_seguras(self) -> int:
+        """Acepta las L2 de la lista ``l2_seguras`` que alcanzan su umbral."""
+
+        if self.sesion is None or self.esta_ocupado():
+            return 0
+        seguras = self.config.l2_seguras()
+        indices = [
+            i for i, h in enumerate(self.sesion.hallazgos)
+            if h.nivel == Nivel.L2 and h.regla in seguras and h.confianza >= seguras[h.regla]
+            and self.sesion.estados[i] == Estado.PENDIENTE
+        ]
+        cambiados = self._decidir(indices, Estado.ACEPTADO)
+        self._estado(f"{cambiados} L2 seguras aceptadas ({', '.join(sorted(seguras))}).")
+        self._anotar(f"Aceptadas {cambiados} L2 seguras.")
+        return cambiados
+
+    def aceptar_regla_actual(self) -> int:
+        """Acepta todos los pendientes de la regla del hallazgo activo."""
+
+        if self.sesion is None or self.esta_ocupado():
+            return 0
+        actual = self.tabla.indice_actual()
+        if actual is None:
+            return 0
+        regla = self.sesion.hallazgos[actual].regla
+        indices = [
+            i for i, h in enumerate(self.sesion.hallazgos)
+            if h.regla == regla and self.sesion.estados[i] == Estado.PENDIENTE
+        ]
+        cambiados = self._decidir(indices, Estado.ACEPTADO)
+        self._estado(f"{cambiados} hallazgos de {regla} aceptados.")
+        return cambiados
+
+    def ver_en_texto(self) -> None:
+        if self.sesion is None:
+            return
+        self.pestanas.setCurrentWidget(self.vista_texto)
+        self._hallazgo_activo(self.tabla.indice_actual())
+
+    def alternar_vista(self) -> None:
+        if self.pestanas.currentWidget() is self.vista_texto:
+            self.pestanas.setCurrentIndex(0)
+            self.tabla.setFocus()
+        else:
+            self.ver_en_texto()
 
     def decidir_seleccion(self, estado: Estado) -> int:
         if self.sesion is None or self.esta_ocupado():
@@ -188,30 +256,21 @@ class VentanaPrincipal(QMainWindow):
             self._error("No hay cambios aceptados. Marca al menos un hallazgo L1 o L2.")
             return
         documento = self.resultado.documento
-        if destino is None and documento.encoding == "docx":
-            if not confirmar:
-                self._error("Los .docx se guardan como texto: indica un destino .md.")
-                return
-            elegido, _ = QFileDialog.getSaveFileName(
-                self,
-                "Guardar el texto corregido",
-                str(documento.ruta.with_suffix(".md")),
-                "Markdown (*.md);;Texto (*.txt)",
-            )
-            if not elegido:
-                return
-            destino = Path(elegido)
         backup = self.backup.isChecked()
         if confirmar:
             resumen = self.sesion.resumen(self.sesion.aceptados())
             l1 = resumen.por_nivel.get("L1", 0)
             l2 = resumen.por_nivel.get("L2", 0)
-            donde = destino or documento.ruta
-            copia = (
-                "Antes se guardará una copia de seguridad con fecha."
-                if backup and destino is None
-                else "Sin copia de seguridad."
+            derivado = documento.encoding in CODIFICACIONES_DERIVADAS
+            donde = destino or (
+                destino_corregido(documento.ruta) if derivado else documento.ruta
             )
+            if derivado:
+                copia = f"El {documento.ruta.suffix} original no se toca."
+            elif backup and destino is None:
+                copia = "Antes se guardará una copia de seguridad con fecha."
+            else:
+                copia = "Sin copia de seguridad."
             respuesta = QMessageBox.question(
                 self,
                 "Aplicar cambios",
@@ -219,6 +278,7 @@ class VentanaPrincipal(QMainWindow):
             )
             if respuesta != QMessageBox.StandardButton.Yes:
                 return
+        self._segundos_corregido = self.segundos_analisis
         trabajador = TrabajadorAplicar(
             self._settings_activos(), self.resultado, parches, backup=backup, destino=destino
         )
@@ -226,7 +286,7 @@ class VentanaPrincipal(QMainWindow):
         self._lanzar(trabajador, "Aplicando cambios…", f"{len(parches)} cambios aceptados.")
 
     def exportar_informe(
-        self, carpeta: Path | None = None, *, formatos: str = "md,csv,json"
+        self, carpeta: Path | None = None, *, formatos: str = "md,csv,json,pdf"
     ) -> None:
         if not self._puede_trabajar() or self.resultado is None:
             return
@@ -247,6 +307,11 @@ class VentanaPrincipal(QMainWindow):
             carpeta,
             formatos=formatos,
             correccion=self.ultima_correccion,
+            segundos=(
+                self._segundos_corregido
+                if self.ultima_correccion is not None
+                else self.segundos_analisis
+            ),
         )
         trabajador.terminado.connect(self._exportacion_terminada)
         self._lanzar(trabajador, "Exportando informe…", str(carpeta))
@@ -379,13 +444,21 @@ class VentanaPrincipal(QMainWindow):
         self.etiqueta_conteo.setObjectName("Muted")
         arriba.addWidget(self.etiqueta_conteo)
         arriba.addStretch(1)
-        for texto, accion in (
-            ("Aceptar visibles", lambda: self.decidir_visibles(Estado.ACEPTADO)),
-            ("Rechazar visibles", lambda: self.decidir_visibles(Estado.RECHAZADO)),
-            ("Restablecer", self.restablecer_decisiones),
+        for texto, accion, ayuda in (
+            ("Aceptar visibles", lambda: self.decidir_visibles(Estado.ACEPTADO),
+             "Acepta todo lo que deja ver el filtro actual."),
+            ("Rechazar visibles", lambda: self.decidir_visibles(Estado.RECHAZADO),
+             "Rechaza todo lo que deja ver el filtro actual."),
+            ("Restablecer", self.restablecer_decisiones,
+             "Vuelve al punto de partida: L1 aceptados y L2 pendientes."),
+            ("Aceptar L2 seguras", self.aceptar_l2_seguras,
+             "Acepta las L2 de reglas verificadas que alcanzan su umbral (Ctrl+L)."),
+            ("Aceptar regla", self.aceptar_regla_actual,
+             "Acepta los pendientes de la regla del hallazgo activo (Ctrl+Shift+A)."),
         ):
             boton = QPushButton(texto)
             boton.setProperty("variant", "ghost")
+            boton.setToolTip(ayuda)
             boton.clicked.connect(accion)
             self._botones_accion.append(boton)
             arriba.addWidget(boton)
@@ -422,17 +495,25 @@ class VentanaPrincipal(QMainWindow):
         self.pila.addWidget(self._construir_vacio())
         self.tabla = TablaHallazgos()
         self.tabla.activo.connect(self._hallazgo_activo)
+        self.tabla.doubleClicked.connect(lambda _i: self.ver_en_texto())
         self.tabla.modelo.decisiones_cambiadas.connect(self._decisiones_cambiadas)
         self.pila.addWidget(self.tabla)
+        self.vista_texto = VistaTexto()
+        self.pestanas = QTabWidget()
+        self.pestanas.setDocumentMode(True)
+        self.pestanas.addTab(self.pila, "Hallazgos")
+        self.pestanas.addTab(self.vista_texto, "Texto completo")
+        self.pestanas.setTabToolTip(1, "El manuscrito con el hallazgo activo resaltado (Ctrl+T).")
 
         layout.addLayout(arriba)
         layout.addWidget(self.etiqueta_vista)
         layout.addLayout(acciones)
-        layout.addWidget(self.pila, 1)
+        layout.addWidget(self.pestanas, 1)
         contenedor = QVBoxLayout(anfitrion)
         contenedor.setContentsMargins(0, 0, 0, 0)
         contenedor.addWidget(envoltura)
         self.capa = CapaOcupado(anfitrion)
+        self.capa.cancelar_pedido.connect(self.cancelar_analisis)
         anfitrion.capa = self.capa
         return anfitrion
 
@@ -444,7 +525,7 @@ class VentanaPrincipal(QMainWindow):
         self.vacio_titulo.setObjectName("EmptyTitle")
         self.vacio_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.vacio_texto = QLabel(
-            "Abre un .md, .txt o .docx. OniriFix lo analiza sin tocarlo;\n"
+            "Abre un .md, .txt, .docx o .pdf. OniriFix lo analiza sin tocarlo;\n"
             "tú decides qué cambios aplicar."
         )
         self.vacio_texto.setObjectName("Muted")
@@ -494,10 +575,14 @@ class VentanaPrincipal(QMainWindow):
             ("Rechazar selección", "R", lambda: self.decidir_seleccion(Estado.RECHAZADO)),
             ("Aceptar visibles", "", lambda: self.decidir_visibles(Estado.ACEPTADO)),
             ("Rechazar visibles", "", lambda: self.decidir_visibles(Estado.RECHAZADO)),
+            ("Aceptar L2 seguras", "Ctrl+L", self.aceptar_l2_seguras),
+            ("Aceptar la regla del hallazgo activo", "Ctrl+Shift+A", self.aceptar_regla_actual),
             ("Restablecer decisiones", "", self.restablecer_decisiones),
         ):
             accion_qt = QAction(texto, self)
-            if atajo:
+            if atajo.startswith("Ctrl"):
+                accion_qt.setShortcut(QKeySequence(atajo))
+            elif atajo:
                 # Atajos de una letra solo dentro de la tabla, para no robar el
                 # teclado al buscador.
                 accion_qt.setShortcut(QKeySequence(atajo))
@@ -505,6 +590,20 @@ class VentanaPrincipal(QMainWindow):
                 self.tabla.addAction(accion_qt)
             accion_qt.triggered.connect(accion)
             revision.addAction(accion_qt)
+
+        ver = self.menuBar().addMenu("Ver")
+        for texto, atajo, accion in (
+            ("Buscar", "Ctrl+F", self._enfocar_busqueda),
+            ("Alternar hallazgos / texto completo", "Ctrl+T", self.alternar_vista),
+            ("Limpiar filtros", "Ctrl+Shift+F", lambda: self.filtros.limpiar()),
+            ("Cancelar análisis", "Esc", self.cancelar_analisis),
+        ):
+            accion_qt = QAction(texto, self)
+            accion_qt.setShortcut(QKeySequence(atajo))
+            accion_qt.triggered.connect(accion)
+            ver.addAction(accion_qt)
+            # Las acciones de la ventana siguen vivas con la capa de ocupado.
+            self.addAction(accion_qt)
 
         herramientas = self.menuBar().addMenu("Herramientas")
         registro = QAction("Registro de la sesión", self)
@@ -525,12 +624,27 @@ class VentanaPrincipal(QMainWindow):
             return False
         return True
 
-    def _lanzar(self, trabajador, titulo: str, detalle: str) -> None:  # type: ignore[no-untyped-def]
+    def _lanzar(  # type: ignore[no-untyped-def]
+        self, trabajador, titulo: str, detalle: str, *, cancelable: bool = False
+    ) -> None:
         self._trabajador = trabajador
         trabajador.fallo.connect(self._trabajo_fallido)
         trabajador.finished.connect(lambda t=trabajador: self._trabajo_finalizado(t))
-        self._fijar_ocupado(True, titulo, detalle)
+        self._fijar_ocupado(True, titulo, detalle, cancelable=cancelable)
         trabajador.start()
+
+    def _avance(self, hechas: int, total: int, detalle: str) -> None:
+        self.capa.progreso_en(hechas, total, detalle)
+        if total > 0:
+            self.progreso.setRange(0, total)
+            self.progreso.setValue(min(hechas, total))
+        else:
+            self.progreso.setRange(0, 0)
+        self.progreso.setFormat(detalle)
+
+    def _analisis_cancelado(self) -> None:
+        self._estado("Análisis cancelado. No se ha cambiado nada.")
+        self._anotar("Análisis cancelado por la persona.")
 
     def _trabajo_finalizado(self, trabajador: object) -> None:
         if trabajador is not self._trabajador:
@@ -544,23 +658,30 @@ class VentanaPrincipal(QMainWindow):
     def _trabajo_fallido(self, mensaje: str) -> None:
         self._error(mensaje)
 
-    def _fijar_ocupado(self, ocupado: bool, titulo: str = "", detalle: str = "") -> None:
+    def _fijar_ocupado(
+        self, ocupado: bool, titulo: str = "", detalle: str = "", *, cancelable: bool = False
+    ) -> None:
         self._ocupado = ocupado
         self.progreso.setVisible(ocupado)
         if ocupado:
             self.progreso.setRange(0, 0)
             self._estado(titulo)
-            self.capa.mostrar(titulo, detalle)
+            self.capa.mostrar(titulo, detalle, cancelable=cancelable)
         else:
             self.capa.ocultar()
         for widget in (self.lateral, self.inspector, self.tabla):
             widget.setEnabled(not ocupado)
         self._sincronizar()
 
-    def _analisis_terminado(self, resultado: ResultadoAnalisis) -> None:
+    def _analisis_terminado(
+        self, resultado: ResultadoAnalisis, segundos: float | None = None
+    ) -> None:
         self.resultado = resultado
+        self.segundos_analisis = segundos
         self.sesion = SesionRevision(resultado)
         self.filtros.cargar_opciones(self.sesion.reglas(), self.sesion.capitulos())
+        self._restaurar_filtros()
+        self.vista_texto.fijar_documento(resultado.documento)
         resumen = self.sesion.resumen()
         self._anotar(
             f"Análisis de {resultado.documento.ruta.name}: {resumen.total} hallazgos "
@@ -569,8 +690,10 @@ class VentanaPrincipal(QMainWindow):
         )
         for error in resultado.errores:
             self._anotar(f"Error en regla: {error}")
+        duracion = f" · {segundos:.1f} s" if segundos is not None else ""
         self._estado(
             f"{resumen.total} hallazgos · {resumen.por_estado['aceptado']} L1 listos para aplicar"
+            + duracion
         )
         self._refrescar_vista()
         self.analisis_listo.emit(resultado)
@@ -617,16 +740,21 @@ class VentanaPrincipal(QMainWindow):
             self.estadisticas.mostrar(Resumen())
             self._sincronizar()
             return
-        indices = self.sesion.filtrar(self.filtros.filtro())
+        filtro = self.filtros.filtro()
+        self._guardar_filtros(filtro)
+        indices = self.sesion.filtrar(filtro)
         self.tabla.cargar(self.sesion, indices)
         self.pila.setCurrentIndex(1 if len(self.sesion) else 0)
+        if len(self.sesion) and not indices:
+            self.etiqueta_conteo.setText("Ningún hallazgo con estos filtros · Ctrl+Shift+F los limpia")
         if not len(self.sesion):
             self.vacio_titulo.setText("Sin hallazgos")
             self.vacio_texto.setText(
                 "Ninguna regla encontró nada. La lectura en voz alta sigue siendo tuya."
             )
             self.vacio_boton.hide()
-        self.etiqueta_conteo.setText(f"{len(indices)} visibles de {len(self.sesion)}")
+        if indices or not len(self.sesion):
+            self.etiqueta_conteo.setText(f"{len(indices)} visibles de {len(self.sesion)}")
         documento = self.sesion.resultado.documento
         self.etiqueta_vista.setText(
             f"{documento.ruta.name} · {documento.palabras} palabras · "
@@ -641,6 +769,7 @@ class VentanaPrincipal(QMainWindow):
             self.inspector.limpiar()
             return
         hallazgo = self.sesion.hallazgos[indice]
+        self.vista_texto.resaltar(hallazgo, titulo=self.sesion.capitulo(indice))
         self.inspector.mostrar(
             hallazgo,
             estado=self.sesion.estados[indice],
@@ -754,6 +883,35 @@ class VentanaPrincipal(QMainWindow):
     def _guardar_secciones(self) -> None:
         plegadas = [clave for clave, s in self._secciones.items() if not s.esta_abierta()]
         self.preferencias.setValue("secciones_plegadas", ",".join(sorted(plegadas)))
+
+    def _enfocar_busqueda(self) -> None:
+        self._secciones["filtros"].abrir(True)
+        self.filtros.texto.setFocus()
+        self.filtros.texto.selectAll()
+
+    def _guardar_filtros(self, filtro: Filtro) -> None:
+        if self._restaurando_filtros:
+            return
+        for campo in ("nivel", "regla", "capitulo", "estado", "texto"):
+            self.preferencias.setValue(f"filtros/{campo}", getattr(filtro, campo))
+
+    def _restaurar_filtros(self) -> None:
+        """Vuelve a poner los filtros de la última sesión (si siguen existiendo)."""
+
+        valores = {
+            campo: str(self.preferencias.value(f"filtros/{campo}", "") or "")
+            for campo in ("nivel", "regla", "capitulo", "estado", "texto")
+        }
+        if not any(valores.values()):
+            return
+        self._restaurando_filtros = True
+        try:
+            self.filtros.blockSignals(True)
+            self.filtros.fijar(**valores)
+        finally:
+            self.filtros.blockSignals(False)
+            self._restaurando_filtros = False
+        self._anotar("Filtros de la última sesión restaurados.")
 
     def _estado(self, texto: str) -> None:
         self.etiqueta_estado.setText(texto)

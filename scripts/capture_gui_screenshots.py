@@ -101,7 +101,7 @@ def main() -> int:
         ventana._fijar_ocupado(
             True,
             "Analizando manuscrito…",
-            f"{manuscrito.name} · 40 reglas. No se modifica nada.",
+            f"{manuscrito.name} · {len(ventana.reglas.seleccion())} reglas. No se modifica nada.",
         )
         _guardar(ventana, app, "10-gui-analizando.png")
         ventana._fijar_ocupado(False)

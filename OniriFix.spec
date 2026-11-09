@@ -31,6 +31,17 @@ REGLAS = [
     "onirifix.reglas._comun",
 ]
 
+# Entrada y salida PDF (extra [pdf]): pdfminer lee PDFs sin poppler y
+# reportlab maqueta el informe y el manuscrito corregido.
+PDF = [
+    "onirifix.io.pdf",
+    "onirifix.informes.pdf",
+    "pdfminer.high_level",
+    "pdfminer.layout",
+    "reportlab.pdfbase.ttfonts",
+    "reportlab.platypus",
+]
+
 EXCLUIR_SIEMPRE = ["docx", "mypy", "pytest", "ruff", "spacy", "spylls"]
 
 # Módulos de Qt que la interfaz no usa: recortan cientos de MB.
@@ -57,7 +68,7 @@ a_cli = Analysis(
     pathex=[str(RAIZ / "src")],
     binaries=[],
     datas=[],
-    hiddenimports=REGLAS,
+    hiddenimports=[*REGLAS, *PDF],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -99,7 +110,7 @@ a_gui = Analysis(
     pathex=[str(RAIZ / "src")],
     binaries=[],
     datas=[(str(ASSETS), "onirifix/assets")],
-    hiddenimports=[*REGLAS, "onirifix.gui.ventana"],
+    hiddenimports=[*REGLAS, *PDF, "onirifix.gui.ventana"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

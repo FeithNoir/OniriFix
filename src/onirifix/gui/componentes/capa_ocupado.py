@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 from onirifix.gui.componentes.spinner import Spinner
 
 
 class CapaOcupado(QFrame):
     """Oscurece el panel central, bloquea clics y explica qué está pasando."""
+
+    cancelar_pedido = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -44,14 +46,21 @@ class CapaOcupado(QFrame):
         interior.addWidget(self.titulo)
         interior.addWidget(self.detalle)
         interior.addWidget(self.progreso)
+        self.boton_cancelar = QPushButton("Cancelar (Esc)")
+        self.boton_cancelar.setProperty("variant", "ghost")
+        self.boton_cancelar.clicked.connect(self.cancelar_pedido.emit)
+        self.boton_cancelar.hide()
         interior.addWidget(self.pista)
+        interior.addWidget(self.boton_cancelar, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(panel, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch(1)
 
-    def mostrar(self, titulo: str, detalle: str = "") -> None:
+    def mostrar(self, titulo: str, detalle: str = "", *, cancelable: bool = False) -> None:
         self.titulo.setText(titulo)
         self.detalle.setText(detalle)
         self.progreso.setRange(0, 0)
+        self.boton_cancelar.setVisible(cancelable)
+        self.boton_cancelar.setEnabled(True)
         self.spinner.iniciar()
         self.show()
         self.raise_()
