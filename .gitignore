@@ -13,8 +13,8 @@ data/*.sqlite
 data/*.sqlite-*
 .onirifix/
 .onirifix-demo/
-informes/
-salida/
+/informes/
+/salida/
 *.bak
 *.bak.*
 *.tmp
