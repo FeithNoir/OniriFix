@@ -1,6 +1,6 @@
 # Catálogo de reglas
 
-OniriFix trae **28 reglas** agrupadas por familia y nivel. El motor no conoce
+OniriFix trae **42 reglas** agrupadas por familia y nivel. El motor no conoce
 sus identificadores: descubre los plugins de `onirifix.reglas` y ejecuta los que
 estén activos. Este documento explica qué detecta cada regla, su nivel, su
 confianza y cómo configurarla.
@@ -32,24 +32,38 @@ L2 siempre exige `--aplicar-l2`.
 | `TIP-008` | L1 | 61 | 0.98 | Sí | Sustituye tabulaciones entre palabras por un espacio. |
 | `TIP-009` | L1 | 5 | 0.96 | Sí | Colapsa `,,`, `;;`, `::`. |
 | `TIP-010` | L3 | 1000 | 0.45 | No | Señala líneas con un número impar de comillas rectas. |
+| `TIP-011` | L1 | 9 | 0.97 | Sí | Limpia elipsis corruptas (`.…`, `….` → `…`). |
+| `TIP-012` | L1 | 8 | 0.94 | Sí | Corrige un signo de apertura usado como cierre (`¡Ya ¡` → `¡Ya!`). |
+| `TIP-013` | L3 | 94 | 0.70 | Sí | Avisa de `?`/`!` sin signo de apertura. |
+| `TIP-014` | L2 | 41 | 0.60 | No | Propone pasar comillas inglesas `“…”` al estilo configurado (opt-in). |
+| `TIP-015` | L1 | 21 | 0.97 | Sí | Quita el espacio tras `¿ ¡ «` y antes de `»`. |
 | `DIA-001` | L1 | 10 | 0.97 | Sí | Baja a minúscula el verbo de habla tras el cierre de un diálogo. |
-| `DIA-002` | L2 | 80 | 0.62 | Sí | Propone minúscula en una reanudación de diálogo. |
-| `DIA-003` | L1 | 4 | 0.92 | No† | Modo RAE estricto: elimina el punto antes de la atribución. |
+| `DIA-002` | L2 | 80 | 0.62 | No | Propone minúscula en una reanudación de diálogo (opt-in). |
+| `DIA-003` | L1 | 4 | 0.92 | No† | Modo RAE estricto: elimina el punto antes de la atribución (conserva `?`, `!` y `…`). |
 | `DIA-004` | L1 | 15 | 0.94 | Sí | Añade el espacio que falta antes de una raya de atribución. |
 | `DIA-005` | L1 | 16 | 0.90 | Sí | Añade el espacio que falta después de una raya de cierre. |
+| `DIA-006` | L2 | 9 | 0.75–0.92 | Sí | Une el verbo de habla suelto al parlamento con raya y minúscula. |
+| `DIA-007` | L2 | 11 | 0.84–0.88 | Sí | Cierra con `—.` el inciso cuando el parlamento sigue (`¿`, `¡` o una raya nueva). |
 | `TIL-001` | L2 | 40 | 0.80–0.96 | Sí | Distingue `hacia` (preposición) de `hacía` (imperfecto). |
 | `TIL-002` | L2 | 41 | 0.74–0.82 | Sí | Detecta futuros truncados (`mirá` → `mirará`). |
+| `TIL-003` | L2 | 38 | 0.60–0.96 | Sí | Pretéritos sin tilde (`señalo` → `señaló`, `conto` → `contó`). |
+| `TIL-004` | L2 | 39 | 0.70–0.92 | Sí | Sustantivo escrito como pretérito tras determinante (`un suspiró`). |
+| `TIL-005` | L2 | 37 | 0.80–0.90 | Sí | Diacríticas e interrogativas indirectas (`Se que` → `Sé que`). |
+| `TIL-006` | L2 | 36 | 0.85–0.90 | Sí | Futuro en lugar de subjuntivo (`como si esperará` → `esperara`). |
 | `HOM-001` | L2 | 42 | 0.93 | Sí | Corrige `haber si` por `a ver si`. |
 | `HOM-002` | L2 | 43 | 0.90 | Sí | Corrige `a ver + participio` por `haber + participio`. |
 | `ORT-001` | L2 | 35 | 0.82 | Sí | Aplica el mapa de correcciones recurrentes del YAML. |
 | `ORT-002` | L2 | 44 | 0.40–0.66 | Sí | Consulta un diccionario Hunspell o una lista de palabras. |
-| `ORT-003` | L2 | 3 | 0.87 | Sí | Detecta palabras repetidas consecutivas (`la la`). |
+| `ORT-003` | L2 | 3 | 0.55–0.92 | Sí | Detecta palabras repetidas consecutivas (`la la`); baja la confianza en repeticiones enfáticas (`muy muy`). |
+| `ORT-004` | L2 | 34 | 0.86 | Sí | Propone mayúscula tras punto (respeta abreviaturas). |
 | `CON-001` | L2 | 45 | 0.97 | Sí | Sustituye variantes registradas por su forma canónica. |
 | `CON-002` | L2 | 46 | 0.84 | Sí | Restaura la capitalización de nombres y lugares canónicos. |
 | `REP-001` | L3 | 90 | 1.00 | Sí | Frecuencia léxica con densidad y desglose por capítulo. |
 | `REP-002` | L3 | 91 | 0.45–1.00 | Sí | Párrafos duplicados exactos o difusos. |
 | `REP-003` | L3 | 92 | 0.50 | Sí | Frases típicas de residuo de IA. |
 | `REP-004` | L3 | 93 | 0.60 | Sí | Frases que superan `repeticion.longitud_frase`. |
+| `REP-005` | L2 | 89 | 0.90–0.92 | Sí | Propone borrar un párrafo u oración repetidos justo a continuación. |
+| `REP-006` | L3 | 88 | 0.80–0.90 | Sí | Restos de asistente, notas de borrador y términos vetados por la obra. |
 
 \* `TIP-006` está apagada en los defaults internos, pero el `config/reglas.yaml`
 de ejemplo la activa.  
@@ -107,6 +121,9 @@ Solo entre letras, para no tocar comillas sueltas. Se controla con
 
 ### TIP-007 · rayas de diálogo
 
+También convierte un guion simple al comienzo de línea (`-Ya voy.` →
+`—Ya voy.`). `- ` con espacio se respeta: es una lista Markdown.
+
 Normaliza:
 
 - `–Hola` o `--Hola` al inicio de línea → `—Hola`;
@@ -130,6 +147,42 @@ Hola,, mundo  →  Hola, mundo
 Cuenta comillas rectas por línea. Es L3 porque una línea puede tener una sola
 comilla legítimamente (por ejemplo, un apóstrofo o un diálogo partido).
 
+### TIP-011 · elipsis corruptas
+
+```text
+Y.…  →  Y…        Bueno….  →  Bueno…
+```
+
+### TIP-012 · signo de cierre invertido
+
+```text
+—¡Ya voy, espérame ¡  →  —¡Ya voy, espérame!
+```
+
+Solo cuando hay un `¡`/`¿` de apertura antes en la misma frase y el signo
+invertido cierra la línea, el diálogo o la cita.
+
+### TIP-013 · falta el signo de apertura (L3)
+
+`Vienes mañana?` se señala, pero no se corrige: decidir dónde empieza la
+pregunta es una decisión de lectura.
+
+### TIP-014 · comillas inglesas (L2, opt-in)
+
+Propone `“…”` → `«…»` (o el estilo de `tipografia.comillas`). Es L2 con
+confianza 0.60 y viene **apagada**: muchas obras reservan las inglesas para
+pensamientos (en la prueba de fuego, 181 propuestas iban contra esa
+convención). Actívala con `reglas.TIP-014: true` si la obra no las usa así.
+
+### TIP-015 · espacio dentro de los signos dobles
+
+```text
+¿ Vienes ?  ¡ Ya !  « hola »  →  ¿Vienes? ¡Ya! «hola»
+```
+
+No toca un `¡` pegado a la palabra anterior (`martillo¡ y`): es un cierre mal
+escrito, no una apertura.
+
 ## Diálogos (DIA)
 
 El diálogo español es la parte más delicada. OniriFix separa lo determinista de
@@ -139,6 +192,8 @@ lo interpretativo.
 
 ```text
 —Basta. —Dijo Mico.  →  —Basta. —dijo Mico.
+—Basta. —Dijo Mico.  →  —Basta —dijo Mico.     (con dialogos.rae_estricto)
+—¡Basta! — Gritó.    →  —¡Basta! —gritó.
 ```
 
 Solo actúa si la palabra está en el catálogo de verbos de habla (incluye los
@@ -153,7 +208,8 @@ se toca.
 
 Propone `la` con confianza `0.62` porque también podría ser una intervención
 nueva. No actúa si la palabra es un nombre del glosario o si no hay una
-atribución previa cercana.
+atribución previa cercana. Viene **apagada**: choca con `DIA-007`, que cierra
+el inciso (`—dijo él—. La puerta…`) y conserva la mayúscula, que es la norma.
 
 ### DIA-003 · modo RAE estricto (opt-in)
 
@@ -162,7 +218,8 @@ atribución previa cercana.
 ```
 
 Se activa con `dialogos.rae_estricto: true` (o `reglas.DIA-003: true`). Cambia
-la puntuación de diálogo, por eso no es el comportamiento por defecto.
+la puntuación de diálogo, por eso no es el comportamiento por defecto. Solo
+quita el **punto**: `—¿Vienes? —preguntó` y `—Eso… —dijo` conservan su signo.
 
 ### DIA-004 · espacio antes de raya
 
@@ -176,6 +233,33 @@ Hola—dijo Mico.  →  Hola —dijo Mico.
 Mico—Las llaves.  →  Mico— Las llaves.
 ```
 
+### DIA-006 · verbo de habla suelto (L2)
+
+```text
+—¿En qué piensas?        —¿En qué piensas? —preguntó Ana.
+Preguntó Ana.        →
+```
+
+Cuando el verbo de habla queda como frase independiente, con mayúscula, en la
+misma línea o en la siguiente. Se une con raya y minúscula. Es L2 porque a veces la
+frase es narración y no atribución.
+
+- Verbos que solo pueden ser de habla (`Preguntó`, `Murmuró`, `Respondió`…)
+  tras un parlamento: confianza 0.92, dentro de las L2 seguras.
+- Verbos que también narran (`Soltó el aire`, `Apuntó al blanco`, `Siguió`,
+  `Concluyó`…): 0.75, quedan pendientes.
+- Si el párrafo anterior ya termina en narración (`—Hola —dijo Ana,
+  sonriendo.`), no se une.
+
+### DIA-007 · inciso sin cerrar ante nueva pregunta (L2)
+
+```text
+—Vale —dijo Ana. ¿Vienes?                    →  —Vale —dijo Ana—. ¿Vienes?
+—Por aquí —dijo Bruno, señalando. —El barco…  →  —Por aquí —dijo Bruno, señalando—. El barco…
+```
+
+El segundo caso exige que el inciso empiece con un verbo de habla.
+
 ## Tildes y homófonos
 
 ### TIL-001 · hacia / hacía (L2)
@@ -187,9 +271,14 @@ heurísticas:
 - `hacia frío`, `hacia tiempo`, `hacia años`… → `hacía`;
 - pronombre o negación delante (`se hacia`, `no hacia`) → `hacía`;
 - verbo de movimiento o determinante después (`caminaba hacia el norte`,
-  `hacia la puerta`) → no toca.
+  `hacia la puerta`) → no toca, aunque haya una negación delante (`pero no
+  hacia la salida`).
 
 Se controla con `tildes.hacia`.
+
+Desde la 0.2 también corrige el caso inverso, `hacía` → `hacia`, cuando hay
+dirección: verbo de movimiento o de mirada delante (`giró hacía`, `miró
+hacía`) o un destino detrás (`hacía adelante`, `hacía allí`, `hacía él`).
 
 ### TIL-002 · futuros truncados (L2)
 
@@ -204,6 +293,68 @@ sus raíces irregulares. Respeta:
 - el glosario de la obra;
 - `tildes.palabras_validas_extra`;
 - el voseo, si `tildes.permitir_voseo: true` (`mirá`, `susurrá`…).
+
+### TIL-003 · pretéritos sin tilde (L2)
+
+```text
+La guardiana asintió y señalo la puerta.  →  …y señaló la puerta.
+Nadie conto las monedas.                  →  Nadie contó las monedas.
+```
+
+- Formas **inequívocas** (`conto`, `respondio`, `continuo` tras sujeto…):
+  confianza 0.90–0.96.
+- Formas **ambiguas** (`miro`, `paso`, `cambio`, que también son presente o
+  sustantivo) solo se marcan con contexto: nombre propio o término del glosario
+  delante, `se`, `él`/`ella`, raya de atribución, coordinación con otro
+  pretérito (0.85), sujeto al inicio de oración (0.82) o artículo + sustantivo
+  (0.75; 0.60 si la palabra es un sustantivo muy frecuente, como en `el tenso
+  silencio`).
+- No marca nada tras determinante o preposición, también en mayúscula (`Ese
+  trago`, `Otro silencio`), ni tras un verbo conjugado (`Buscó apoyo`). `bajo`,
+  `trono` y `vacío` ya no son candidatos: casi siempre son preposición,
+  sustantivo o adjetivo.
+- `tildes.forma_rio` decide entre `rió` (por defecto, lo que pide el informe) y
+  `rio` (ortografía RAE 2010).
+
+### TIL-004 · sustantivo escrito como pretérito (L2)
+
+```text
+Hubo un suspiró largo.   →  Hubo un suspiro largo.
+Vivían en un barrió viejo. →  Vivían en un barrio viejo.
+```
+
+Solo tras determinante (`un`, `el`, `su`, `aquel`…), con adjetivos puente
+permitidos. Con `el` a secas la confianza baja a 0.70 (`el giró` puede ser
+sujeto + verbo). Si detrás viene un determinante o posesivo (`cuando este posó
+su mano`), es el verbo y no se marca.
+
+### TIL-005 · diacríticas e interrogativas indirectas (L2)
+
+```text
+Se que no me crees.        →  Sé que no me crees.
+Sí, se lo dije a el.       →  Sí, se lo dije a él.
+No sabía que hacer.        →  No sabía qué hacer.
+```
+
+Cubre `Sé` (primera persona), `Sí` afirmativo/enfático, `él` tras preposición,
+`qué`/`cómo`/`dónde` ante infinitivo y tras verbos de duda o pregunta. No toca
+`Por qué`/`Porque`: depende del sentido.
+
+- `el…` / `el...` (frase cortada) es artículo, no pronombre.
+- `que` + infinitivo no lleva tilde si la oración sigue con un verbo
+  conjugado: `Sabía que cambiar de rumbo pondría en riesgo a todos` (el
+  infinitivo es el sujeto).
+
+### TIL-006 · futuro en lugar de subjuntivo (L2)
+
+```text
+Lo miró como si esperará una respuesta.  →  …como si esperara una respuesta.
+Antes de que estallará la tormenta…      →  Antes de que estallara…
+```
+
+Disparadores: `como si`, `antes de que`, `hasta que`, `dejó que`, `para que`,
+`sin que`. Convierte la forma con un mapa de irregulares (`tendrá` →
+`tuviera`, `hará` → `hiciera`…).
 
 ### HOM-001 · haber si
 
@@ -240,6 +391,10 @@ ortografia:
 Respeta mayúsculas/minúsculas (`Q` → `Que`). Un mapa vacío (`correcciones: {}`)
 desactiva esta regla sin tocar el resto de la configuración.
 
+Las claves de una o dos letras (`d: de`) solo se buscan en minúscula y sin
+apóstrofo ni punto detrás: `Rango D`, `D'Artagnan` o la inicial `J. D.` no se
+tocan.
+
 ### ORT-002 · diccionario
 
 Necesita `ortografia.diccionario` (Hunspell/spylls) o
@@ -253,7 +408,18 @@ de menos de dos letras.
 La la ciudad  →  La ciudad
 ```
 
-Solo palabras consecutivas separadas por espacios o tabulaciones.
+Solo palabras consecutivas separadas por espacios o tabulaciones. Las
+repeticiones enfáticas (`muy muy`, `sí sí`, `no no`) bajan a 0.55 para que no
+superen el umbral L2 por defecto.
+
+### ORT-004 · mayúscula tras punto (L2)
+
+```text
+El tren iba lento. casi parado.  →  El tren iba lento. Casi parado.
+```
+
+Ignora abreviaturas (`p. ej.`, `etc.`, `Sr.`), números y el interior de
+paréntesis y citas.
 
 ## Consistencia onomástica (CON)
 
@@ -284,9 +450,10 @@ mayúscula interna, apóstrofo o comilla tipográfica. Así `Mico` (que también
 un animal) no se corrige a ciegas. Se puede limitar con
 `consistencia.incluir_personajes`, `incluir_lugares` e `incluir_terminos`.
 
-## Repetición y residuo (REP, L3)
+## Repetición y residuo (REP)
 
-Estas reglas **nunca** generan parches. Su salida es material para el editor.
+Salvo `REP-005` (L2), estas reglas **nunca** generan parches. Su salida es
+material para el editor.
 
 ### REP-001 · frecuencia léxica
 
@@ -309,12 +476,56 @@ el rendimiento en manuscritos enormes.
 ### REP-003 · residuo de IA
 
 Busca frases declaradas en `residuo_ia.frases` (`en el vasto tapiz`,
-`un testimonio de`, `una sinfonía de`…). Solo informa: no reescribe.
+`un testimonio de`, `una sinfonía de`…). Solo informa: no reescribe. Frases
+corrientes en cualquier prosa (`no solo`, `el peso de`, `el eco de`,
+`en resumen`, `en el corazón de`) salieron de la lista tras la prueba de fuego:
+daban 94 avisos que no decían nada.
 
 ### REP-004 · frases largas
 
 Señala oraciones con más de `repeticion.longitud_frase` palabras (60 por
 defecto). Es una señal de ritmo, no un error gramatical.
+
+### REP-005 · duplicado consecutivo (L2)
+
+Propone borrar un párrafo, o una oración, idéntico al inmediatamente anterior
+(restos de fusionar versiones). Umbrales: `duplicados.minimo_palabras_consecutivo`
+(párrafos) y `duplicados.minimo_palabras_oracion`. Los duplicados lejanos o
+casi idénticos siguen siendo cosa de `REP-002`: elegir cuál se queda es
+editorial.
+
+### REP-006 · residuos de borrador y términos vetados (L3)
+
+Señala frases de asistente (`Aquí tienes`, `¡Qué buena idea`, `Espero que te guste`),
+marcadores (`(Contexto anterior…)`, `Escena ampliada`, `[TODO]`, `TODO:`) y los
+términos de `residuos_borrador.vetados` (anacronismos que la obra no admite).
+`residuos_borrador.patrones` acepta expresiones regulares extra. Nunca borra.
+
+Las fórmulas que un personaje también puede decir (`Aquí tienes`, `Si quieres,
+puedo…`) se ignoran dentro de un parlamento, y `TODO` solo cuenta como marcador
+seguido de `:`, `]` o `(` (no `—¡TODO LO QUE TENGO!`).
+
+## L2 seguras
+
+`l2_seguras` en `config/reglas.yaml` lista las reglas L2 cuya precisión se
+comprobó a mano en un manuscrito real, cada una con su umbral:
+
+```yaml
+l2_seguras:
+  DIA-006: 0.92
+  DIA-007: 0.88
+  TIL-001: 0.88
+  TIL-003: 0.88
+  TIL-004: 0.92
+  TIL-005: 0.86
+  TIL-006: 0.9
+  ORT-001: 0.82
+  ORT-004: 0.86
+```
+
+`onirifix corregir --l2-seguras --aplicar` y el botón **Aceptar L2 seguras**
+de la interfaz aplican esas L2 además de los L1. El resto de L2 queda
+pendiente y aparece en el informe con su contexto.
 
 ## Configuración de las reglas
 

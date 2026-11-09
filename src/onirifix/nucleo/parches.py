@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import difflib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from onirifix.modelo import Hallazgo, Nivel, Parche
 
@@ -14,11 +14,18 @@ def seleccionar_parches(
     niveles: set[Nivel] | None = None,
     aplicar_l2: bool = False,
     umbral_l2: float = 0.90,
+    l2_seguras: Mapping[str, float] | None = None,
 ) -> list[Parche]:
-    """Convierte hallazgos aplicables en parches, respetando los tres niveles."""
+    """Convierte hallazgos aplicables en parches, respetando los tres niveles.
+
+    ``l2_seguras`` ({regla: umbral}) deja pasar las L2 de esas reglas que
+    alcanzan su umbral propio aunque ``aplicar_l2`` sea falso.
+    """
 
     seleccionados: list[Parche] = []
-    niveles = niveles or {Nivel.L1, Nivel.L2}
+    niveles = set(niveles or {Nivel.L1, Nivel.L2})
+    if l2_seguras:
+        niveles.add(Nivel.L2)
     for hallazgo in hallazgos:
         if hallazgo.sugerencia is None:
             continue
@@ -27,7 +34,13 @@ def seleccionar_parches(
         if hallazgo.nivel == Nivel.L1:
             pass
         elif hallazgo.nivel == Nivel.L2:
-            if not aplicar_l2 or hallazgo.confianza < umbral_l2:
+            segura = (
+                l2_seguras is not None
+                and hallazgo.regla in l2_seguras
+                and hallazgo.confianza >= l2_seguras[hallazgo.regla]
+            )
+            general = aplicar_l2 and hallazgo.confianza >= umbral_l2
+            if not (segura or general):
                 continue
         else:
             continue

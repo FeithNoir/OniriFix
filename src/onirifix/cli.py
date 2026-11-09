@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import importlib.util
 import sys
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +21,7 @@ from onirifix.config import Configuracion, Settings, cargar_settings
 from onirifix.db.importador import escribir_yaml, exportar_yaml, importar_yaml
 from onirifix.db.repositorios import Registro
 from onirifix.informes import escribir_informes
+from onirifix.informes.pdf import ErrorExportacionPdf
 from onirifix.informes.terminal import (
     mostrar_aviso,
     mostrar_correccion,
@@ -33,15 +35,13 @@ from onirifix.informes.terminal import (
 from onirifix.io.cargadores import ErrorLectura
 from onirifix.log import configurar_logging
 from onirifix.modelo import Nivel, Obra, Parche, ResultadoCorreccion
-from onirifix.nucleo.backups import crear_backup
-from onirifix.nucleo.parches import aplicar_parches
 from onirifix.nucleo.registro_reglas import descubrir_reglas
 from onirifix.servicio import (
     abrir_contexto,
     analizar,
+    aplicar_seleccion,
     corregir,
     parsear_niveles,
-    registrar_auditoria,
 )
 from onirifix.util import configurar_salida_utf8, slugify
 
@@ -55,7 +55,7 @@ def manejar_errores(func: Callable[..., Any]) -> Callable[..., Any]:
             return func(*args, **kwargs)
         except click.ClickException:
             raise
-        except (ValueError, OSError, UnicodeError, ErrorLectura) as exc:
+        except (ValueError, OSError, UnicodeError, ErrorLectura, ErrorExportacionPdf) as exc:
             raise click.ClickException(str(exc)) from exc
 
     return wrapper
@@ -86,6 +86,7 @@ def _escribir(
     salida: Path | None,
     formato: str,
     correccion: ResultadoCorreccion | None = None,
+    segundos: float | None = None,
 ) -> dict[str, Path]:
     return escribir_informes(
         resultado,
@@ -93,6 +94,7 @@ def _escribir(
         formatos=formato,
         correccion=correccion,
         max_por_regla=_max_por_regla(config),
+        segundos=segundos,
     )
 
 
@@ -233,12 +235,14 @@ def analizar_cmd(
 
     settings = _settings(obj)
     with abrir_contexto(settings) as ctx:
+        inicio = time.perf_counter()
         resultado = analizar(
             ctx,
             archivo,
             solo_reglas=_lista_ids(reglas),
             incluir_l3=not sin_l3,
         )
+        segundos = time.perf_counter() - inicio
         rutas: dict[str, Path] = {}
         if not sin_informes:
             rutas = _escribir(
@@ -247,8 +251,9 @@ def analizar_cmd(
                 resultado,
                 salida=salida,
                 formato=formato,
+                segundos=segundos,
             )
-        mostrar_resultado(resultado, obra=ctx.obra.slug, rutas=rutas)
+        mostrar_resultado(resultado, obra=ctx.obra.slug, rutas=rutas, segundos=segundos)
     if estricto and any(
         hallazgo.nivel in {Nivel.L1, Nivel.L2} for hallazgo in resultado.hallazgos
     ):
@@ -266,12 +271,23 @@ def analizar_cmd(
 )
 @click.option("--aplicar", is_flag=True, help="Escribe los cambios (por defecto dry-run).")
 @click.option("--aplicar-l2", is_flag=True, help="Permite aplicar hallazgos L2.")
+@click.option(
+    "--l2-seguras",
+    is_flag=True,
+    help="Aplica también las L2 de la lista `l2_seguras` que alcanzan su umbral.",
+)
 @click.option("--umbral", type=click.FloatRange(0.0, 1.0), default=None, help="Confianza mínima L2.")
 @click.option("--backup/--sin-backup", "backup", default=None, help="Copia de seguridad antes de escribir.")
 @click.option("--destino", type=click.Path(dir_okay=False, path_type=Path), default=None)
 @click.option("--salida", "-s", type=click.Path(file_okay=False, path_type=Path), default=None)
 @click.option("--sin-informes", is_flag=True)
-@click.option("--formato", "-f", default="md,csv,json,diff", show_default=True)
+@click.option(
+    "--formato",
+    "-f",
+    default="md,csv,json,diff",
+    show_default=True,
+    help="Añade `pdf` para el informe PDF y el manuscrito corregido en PDF.",
+)
 @click.pass_obj
 @manejar_errores
 def corregir_cmd(
@@ -280,6 +296,7 @@ def corregir_cmd(
     nivel: str,
     aplicar: bool,
     aplicar_l2: bool,
+    l2_seguras: bool,
     umbral: float | None,
     backup: bool | None,
     destino: Path | None,
@@ -301,6 +318,9 @@ def corregir_cmd(
     backup_final = settings.backup if backup is None else backup
 
     with abrir_contexto(settings) as ctx:
+        inicio = time.perf_counter()
+        analisis = analizar(ctx, archivo, incluir_l3=True)
+        segundos = time.perf_counter() - inicio
         correccion = corregir(
             ctx,
             archivo,
@@ -310,6 +330,8 @@ def corregir_cmd(
             umbral_l2=umbral_final,
             backup=backup_final,
             destino=destino,
+            l2_seguras=l2_seguras,
+            analisis=analisis,
         )
         rutas: dict[str, Path] = {}
         if not sin_informes:
@@ -320,11 +342,13 @@ def corregir_cmd(
                 salida=salida,
                 formato=formato,
                 correccion=correccion,
+                segundos=segundos,
             )
         mostrar_resultado(
             correccion.analisis,
             obra=ctx.obra.slug,
             rutas=rutas,
+            segundos=segundos,
         )
         mostrar_correccion(correccion)
 
@@ -436,39 +460,15 @@ def revisar_cmd(
             if parche:
                 parches.append(parche)
 
-        texto, aplicados, omitidos = aplicar_parches(resultado.documento.texto, parches)
-        correccion = ResultadoCorreccion(
-            analisis=resultado,
-            texto_corregido=texto,
-            parches_seleccionados=parches,
-            aplicados=aplicados,
-            omitidos=omitidos,
+        correccion = aplicar_seleccion(
+            ctx,
+            resultado,
+            parches,
+            aplicar=not simular,
+            backup=backup_final,
+            destino=destino,
+            archivo=archivo,
         )
-        if aplicados and not simular:
-            destino_final = (destino or archivo).expanduser()
-            if (
-                resultado.documento.encoding == "docx"
-                and destino_final.suffix.lower() == ".docx"
-            ):
-                raise click.ClickException(
-                    "La escritura .docx no está implementada; usa --destino archivo.md."
-                )
-            if destino_final.resolve() == archivo.resolve() and backup_final:
-                correccion.backup = crear_backup(archivo, settings.backups)
-            from onirifix.io.cargadores import escribir_texto
-
-            encoding = (
-                "utf-8"
-                if resultado.documento.encoding == "docx"
-                else resultado.documento.encoding
-            )
-            escribir_texto(destino_final, texto, encoding=encoding)
-            correccion.escrito = True
-            correccion.destino = destino_final
-            if settings.auditoria:
-                registrar_auditoria(ctx, resultado, aplicados)
-        elif simular:
-            correccion.escrito = False
 
         if salida is not None:
             rutas = _escribir(
@@ -553,6 +553,32 @@ def duplicados_cmd(
 
 
 # ---------------------------------------------------------------------------
+# Interfaz de escritorio
+# ---------------------------------------------------------------------------
+
+
+@cli.command("gui")
+@click.argument(
+    "archivo",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.pass_obj
+@manejar_errores
+def gui_cmd(obj: dict[str, Any], archivo: Path | None) -> None:
+    """Abre la interfaz de escritorio (requiere el extra [gui])."""
+
+    if importlib.util.find_spec("PySide6") is None:
+        raise click.ClickException(
+            "La interfaz necesita PySide6. Instálala con: pip install -e \".[gui]\" "
+            "(en Windows, abre OniriFix-GUI.exe)."
+        )
+    from onirifix.gui.app import main as lanzar_gui
+
+    raise click.exceptions.Exit(lanzar_gui([sys.argv[0]], settings=_settings(obj), archivo=archivo))
+
+
+# ---------------------------------------------------------------------------
 # Diagnóstico
 # ---------------------------------------------------------------------------
 
@@ -585,6 +611,7 @@ def doctor_cmd(obj: dict[str, Any]) -> None:
         ("spacy", "spacy", False),
         ("spylls", "spylls", False),
         ("docx", "python-docx", False),
+        ("PySide6", "PySide6 (interfaz)", False),
     ):
         presente = importlib.util.find_spec(modulo) is not None
         estado = "ok" if presente else ("falta" if obligatorio else "opcional, no instalado")

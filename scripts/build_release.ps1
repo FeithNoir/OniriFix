@@ -27,10 +27,13 @@ try {
         throw "Fallo al generar el icono."
     }
 
-    Write-Host "Construyendo dist\OniriFix.exe..." -ForegroundColor Cyan
+    Write-Host "Construyendo dist\OniriFix.exe y dist\OniriFix-GUI.exe..." -ForegroundColor Cyan
     & $PyInstaller --noconfirm --clean "OniriFix.spec"
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $Root "dist\OniriFix.exe"))) {
         throw "PyInstaller no genero dist\OniriFix.exe."
+    }
+    if (-not (Test-Path (Join-Path $Root "dist\OniriFix-GUI.exe"))) {
+        throw "PyInstaller no genero dist\OniriFix-GUI.exe (¿falta PySide6? pip install -e .[build])."
     }
 
     if (-not $SkipTests) {

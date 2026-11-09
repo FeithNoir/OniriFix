@@ -11,6 +11,8 @@ try:  # pragma: no cover
 except ImportError:  # pragma: no cover
     import re  # type: ignore[no-redef]
 
+import itertools
+
 from onirifix.config import Configuracion
 from onirifix.modelo import Capitulo, Contexto, Documento, Glosario, Hallazgo, Nivel, crear_hallazgo
 from onirifix.nucleo.registro_reglas import registrar
@@ -293,3 +295,187 @@ class FrasesLargas:
             )
             if hallazgo:
                 yield hallazgo
+
+
+def _normalizar(texto: str) -> str:
+    return " ".join(texto.split()).casefold()
+
+
+@registrar
+class DuplicadoConsecutivo:
+    id = "REP-005"
+    nivel = Nivel.L2
+    descripcion = "Propone borrar un párrafo u oración repetidos literalmente justo a continuación."
+    prioridad = 89
+    por_defecto = True
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        minimo_parrafo = int(ctx.config.obtener("duplicados.minimo_palabras_consecutivo", 4) or 4)
+        minimo_oracion = int(ctx.config.obtener("duplicados.minimo_palabras_oracion", 3) or 3)
+
+        anterior: tuple[str, int, int] | None = None
+        for parrafo, inicio, fin in parrafos_con_offset(texto):
+            normalizado = _normalizar(parrafo)
+            if (
+                anterior is not None
+                and normalizado == anterior[0]
+                and contar_palabras(normalizado) >= minimo_parrafo
+            ):
+                hallazgo = crear_hallazgo(
+                    texto,
+                    regla=self.id,
+                    nivel=self.nivel,
+                    # Se borra desde el final del párrafo anterior: la copia y
+                    # el salto que la separa desaparecen juntos.
+                    inicio=anterior[2],
+                    fin=fin,
+                    sugerencia="",
+                    confianza=0.92,
+                    nota=(
+                        "Párrafo idéntico al anterior (resto de fusión de versiones). "
+                        "Se propone borrar la copia."
+                    ),
+                    radio_contexto=30,
+                )
+                if hallazgo:
+                    yield hallazgo
+                continue
+            anterior = (normalizado, inicio, fin)
+
+        oraciones = dividir_oraciones(texto)
+        for (previa, _, fin_previa), (actual, inicio_actual, fin_actual) in itertools.pairwise(oraciones):
+            separador = texto[fin_previa:inicio_actual]
+            if separador.strip() or "\n" in separador:
+                continue
+            if _normalizar(previa) != _normalizar(actual):
+                continue
+            if contar_palabras(actual) < minimo_oracion:
+                continue
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=fin_previa,
+                fin=fin_actual,
+                sugerencia="",
+                confianza=0.9,
+                nota="Oración repetida literalmente a continuación. Se propone borrar la copia.",
+            )
+            if hallazgo:
+                yield hallazgo
+
+
+# Restos de asistentes de IA, notas de borrador y marcadores de plantilla. Son
+# expresiones regulares (sin distinción de mayúsculas) y se pueden ampliar en
+# ``residuos_borrador.patrones`` del YAML.
+PATRONES_RESIDUO_BORRADOR: tuple[str, ...] = (
+    r"aqu[ií] tienes",
+    r"claro, aqu[ií]",
+    r"¡?qu[eé] (?:excelente|buena|gran) (?:adici[oó]n|idea|pregunta)",
+    r"ampliaci[oó]n del fragmento",
+    r"\(?contexto anterior[^)\n]*\)?",
+    r"escena ampliada(?: \([^)\n]*\))?",
+    r"versi[oó]n (?:ampliada|mejorada|revisada) del",
+    r"como (?:modelo de lenguaje|asistente)",
+    r"espero que (?:te|le) (?:guste|sirva)",
+    r"¿quieres que (?:contin[uú]e|siga|ampl[ií]e)",
+    r"si quieres,? puedo",
+    r"puedo ayudarte",
+    r"nota del autor",
+    r"n\. del a\.",
+    r"\[(?:insertar|nota|pendiente|todo|tbd|revisar)[^\]\n]*\]",
+    # Marcadores en mayúsculas seguidos de «:», «]» o «(»: «TODO LO QUE…»
+    # gritado en un diálogo no es una nota de borrador.
+    r"(?-i:\b(?:TODO|FIXME|XXX|TBD)\b(?=[ \t]*[:\](]))",
+    r"lorem ipsum",
+    r"\*\*[^*\n]{1,80}\*\*",
+    r"```",
+    r"sobre la trama",
+)
+
+
+# Fórmulas de asistente que un personaje también puede decir («—Aquí tienes.»).
+# Dentro de un parlamento se ignoran.
+_PATRONES_CONVERSACIONALES = {
+    r"aqu[ií] tienes",
+    r"claro, aqu[ií]",
+    r"si quieres,? puedo",
+    r"puedo ayudarte",
+    r"espero que (?:te|le) (?:guste|sirva)",
+}
+
+
+def _en_parlamento(texto: str, posicion: int) -> bool:
+    inicio = texto.rfind("\n", 0, posicion) + 1
+    linea = texto[inicio:posicion]
+    return linea.lstrip().startswith("—") and linea.count("—") % 2 == 1
+
+
+@registrar
+class ResiduosDeBorrador:
+    id = "REP-006"
+    nivel = Nivel.L3
+    descripcion = "Señala restos de asistente de IA, notas de borrador y términos vetados por la obra."
+    prioridad = 88
+    por_defecto = True
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        extra = ctx.config.obtener("residuos_borrador.patrones", []) or []
+        patrones = [*PATRONES_RESIDUO_BORRADOR, *(str(p) for p in extra)]
+        vetados = [str(v) for v in (ctx.config.obtener("residuos_borrador.vetados", []) or [])]
+
+        vistos: set[int] = set()
+        for patron in patrones:
+            try:
+                compilado = re.compile(patron, re.IGNORECASE | re.UNICODE)
+            except re.error:
+                continue
+            conversacional = patron in _PATRONES_CONVERSACIONALES
+            for match in compilado.finditer(texto):
+                if match.start() in vistos or match.end() == match.start():
+                    continue
+                if conversacional and _en_parlamento(texto, match.start()):
+                    continue
+                vistos.add(match.start())
+                hallazgo = crear_hallazgo(
+                    texto,
+                    regla=self.id,
+                    nivel=self.nivel,
+                    inicio=match.start(),
+                    fin=match.end(),
+                    sugerencia=None,
+                    confianza=0.8,
+                    nota=(
+                        "Posible resto de asistente, nota de borrador o marcador. "
+                        "Ningún texto así debe quedar en la versión publicable."
+                    ),
+                )
+                if hallazgo:
+                    yield hallazgo
+
+        for termino in vetados:
+            if not termino.strip():
+                continue
+            compilado = re.compile(
+                r"(?<![^\W\d_])" + re.escape(termino) + r"(?![^\W\d_])",
+                re.IGNORECASE | re.UNICODE,
+            )
+            for match in compilado.finditer(texto):
+                if match.start() in vistos:
+                    continue
+                vistos.add(match.start())
+                hallazgo = crear_hallazgo(
+                    texto,
+                    regla=self.id,
+                    nivel=self.nivel,
+                    inicio=match.start(),
+                    fin=match.end(),
+                    sugerencia=None,
+                    confianza=0.9,
+                    nota=(
+                        f"«{termino}» está en la lista de términos vetados de la obra "
+                        "(anacronismo o préstamo no deseado)."
+                    ),
+                )
+                if hallazgo:
+                    yield hallazgo

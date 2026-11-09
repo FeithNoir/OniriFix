@@ -13,14 +13,42 @@ data/*.sqlite
 data/*.sqlite-*
 .onirifix/
 .onirifix-demo/
-informes/
-salida/
+/informes/
+/salida/
 *.bak
 *.bak.*
 *.tmp
 
 # Copias de seguridad con marca de tiempo
 *.20[0-9][0-9][0-1][0-9][0-3][0-9]-*.bak
+backups/
+
+# Preferencias locales de la interfaz (ventana, carpetas recientes)
+gui.ini
+
+# ---------------------------------------------------------------------------
+# Manuscritos e informes editoriales: NUNCA al repositorio
+# ---------------------------------------------------------------------------
+# El texto de una novela inédita y los informes de lectura son privados. Los
+# ejemplos versionados son frases inventadas (examples/, tests/).
+*.pdf
+*.docx
+*.odt
+*.rtf
+*.epub
+manuscritos/
+manuscripts/
+privado/
+correcciones*.txt
+informe-*.md
+informe.md
+hallazgos.csv
+hallazgos.json
+parches.diff
+*.corregido.md
+*.corregido.txt
+*.bak
+!examples/*.md
 
 # ---------------------------------------------------------------------------
 # Python
@@ -50,8 +78,14 @@ MANIFEST
 pip-wheel-metadata/
 pip-delete-this-directory.txt
 
+# PyInstaller (el OniriFix.spec sí se versiona)
+*.manifest
+warn-*.txt
+xref-*.html
+
 # Entornos virtuales
 .venv/
+.venv*/
 venv/
 ENV/
 env/
@@ -80,8 +114,15 @@ htmlcov/
 *.swo
 *~
 .DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+__MACOSX/
 Thumbs.db
+ehthumbs.db
 desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # ---------------------------------------------------------------------------
 # Referencias internas

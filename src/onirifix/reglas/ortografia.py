@@ -34,11 +34,27 @@ class CorreccionesExplicitas:
         }
         if not mapa:
             return
-        patron = re.compile(
-            r"\b(?:" + "|".join(re.escape(k) for k in sorted(mapa, key=len, reverse=True)) + r")\b",
-            flags=re.IGNORECASE | re.UNICODE,
+        # Las claves de una o dos letras («d» → «de») solo se buscan en
+        # minúscula y sin apóstrofo ni punto detrás: «Rango D», «D'Artagnan»
+        # o una inicial «D.» no son errores.
+        largas = sorted((k for k in mapa if len(k) > 2), key=len, reverse=True)
+        cortas = sorted((k for k in mapa if len(k) <= 2), key=len, reverse=True)
+        patrones = []
+        if largas:
+            patrones.append(re.compile(
+                r"\b(?:" + "|".join(re.escape(k) for k in largas) + r")\b",
+                flags=re.IGNORECASE | re.UNICODE,
+            ))
+        if cortas:
+            patrones.append(re.compile(
+                r"(?<![^\W\d_]['’.]?)\b(?:" + "|".join(re.escape(k) for k in cortas)
+                + r")\b(?!['’.\-][^\W\d_]|\.)",
+                flags=re.UNICODE,
+            ))
+        coincidencias = sorted(
+            (m for p in patrones for m in p.finditer(texto)), key=lambda m: m.start()
         )
-        for match in patron.finditer(texto):
+        for match in coincidencias:
             original = match.group(0)
             reemplazo = mapa.get(original.casefold())
             if not reemplazo:
@@ -114,6 +130,9 @@ class DiccionarioOrtografico:
                 yield hallazgo
 
 
+_ENFATICAS = ("muy", "sí", "no", "ya", "bien", "casi", "más", "nunca", "corre", "ven", "vamos", "ja", "je", "bla", "toc", "tic", "tac", "pum", "plaf", "mal")
+
+
 @registrar
 class PalabraRepetida:
     id = "ORT-003"
@@ -128,16 +147,74 @@ class PalabraRepetida:
     )
 
     def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        enfaticas = {
+            str(p).casefold()
+            for p in (ctx.config.obtener("ortografia.repeticiones_enfaticas", None) or _ENFATICAS)
+        }
         for match in self._patron.finditer(texto):
+            palabra = match.group("palabra")
+            # «muy muy», «sí sí», «ya ya»: duplicación expresiva, frecuente en
+            # diálogo. Se informa con confianza baja para que no se aplique sola.
+            enfatica = palabra.casefold() in enfaticas
             hallazgo = crear_hallazgo(
                 texto,
                 regla=self.id,
                 nivel=self.nivel,
                 inicio=match.start(),
                 fin=match.end(),
-                sugerencia=match.group("palabra"),
-                confianza=0.87,
-                nota="Palabra repetida consecutiva.",
+                sugerencia=palabra,
+                confianza=0.55 if enfatica else 0.92,
+                nota=(
+                    "Repetición expresiva; bórrala solo si no es intencional."
+                    if enfatica
+                    else "Palabra repetida consecutiva."
+                ),
+            )
+            if hallazgo:
+                yield hallazgo
+
+
+_ABREVIATURAS = {
+    "etc", "sr", "sra", "srta", "dr", "dra", "ud", "uds", "vd", "vds", "pág", "págs", "núm",
+    "vs", "aprox", "cap", "art", "fig", "ej", "p", "a", "c", "av", "avda", "lic", "ing",
+    "prof", "gral", "dpto", "tel", "st", "mr", "mrs", "ms", "jr",
+}
+
+
+@registrar
+class MayusculaTrasPunto:
+    id = "ORT-004"
+    nivel = Nivel.L2
+    descripcion = "Propone mayúscula tras punto («iba lento. casi parado» → «lento. Casi»)."
+    prioridad = 34
+    por_defecto = True
+
+    _patron = re.compile(
+        r"(?P<previa>[^\W\d_]+)\.(?P<espacio>[ \t]+)(?P<letra>[a-záéíóúüñ])", re.UNICODE
+    )
+
+    def aplicar(self, texto: str, ctx: Contexto) -> Iterator[Hallazgo]:
+        extra = {
+            str(a).casefold().rstrip(".")
+            for a in (ctx.config.obtener("ortografia.abreviaturas", []) or [])
+        }
+        for match in self._patron.finditer(texto):
+            previa = match.group("previa")
+            if previa.casefold() in _ABREVIATURAS | extra:
+                continue
+            # Siglas con puntos («E.E.U.U.») o iniciales («J. R.»).
+            if len(previa) == 1 or texto[max(0, match.start() - 1) : match.start()] == ".":
+                continue
+            letra = match.group("letra")
+            hallazgo = crear_hallazgo(
+                texto,
+                regla=self.id,
+                nivel=self.nivel,
+                inicio=match.start("letra"),
+                fin=match.end("letra"),
+                sugerencia=letra.upper(),
+                confianza=0.86,
+                nota="Tras punto y seguido la oración empieza con mayúscula.",
             )
             if hallazgo:
                 yield hallazgo

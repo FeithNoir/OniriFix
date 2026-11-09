@@ -24,6 +24,20 @@ DEFAULTS: dict[str, Any] = {
     "version": 1,
     "idioma": "es",
     "umbral_l2": 0.90,
+    # L2 «seguras»: reglas L2 cuya precisión se ha verificado en un manuscrito
+    # real. Con `corregir --l2-seguras` (o «Aceptar L2 seguras» en la
+    # interfaz) se aplican si su confianza llega al umbral de cada una.
+    "l2_seguras": {
+        "DIA-006": 0.92,
+        "DIA-007": 0.88,
+        "TIL-001": 0.88,
+        "TIL-003": 0.88,
+        "TIL-004": 0.92,
+        "TIL-005": 0.86,
+        "TIL-006": 0.9,
+        "ORT-001": 0.82,
+        "ORT-004": 0.86,
+    },
     "backup": True,
     "auditoria": True,
     "informes": {
@@ -42,7 +56,7 @@ DEFAULTS: dict[str, Any] = {
         "TIP-009": True,
         "TIP-010": False,
         "DIA-001": True,
-        "DIA-002": True,
+        "DIA-002": False,
         "DIA-003": False,
         "DIA-004": True,
         "DIA-005": True,
@@ -59,6 +73,20 @@ DEFAULTS: dict[str, Any] = {
         "REP-002": True,
         "REP-003": True,
         "REP-004": True,
+        "TIP-011": True,
+        "TIP-012": True,
+        "TIP-013": True,
+        "TIP-014": False,
+        "TIP-015": True,
+        "DIA-006": True,
+        "DIA-007": True,
+        "TIL-003": True,
+        "TIL-004": True,
+        "TIL-005": True,
+        "TIL-006": True,
+        "ORT-004": True,
+        "REP-005": True,
+        "REP-006": True,
     },
     "tipografia": {
         "comillas": "«»",
@@ -80,6 +108,10 @@ DEFAULTS: dict[str, Any] = {
         "futuros_truncados": True,
         "permitir_voseo": False,
         "palabras_validas_extra": [],
+        "preteritos": True,
+        "forma_rio": "rió",
+        "diacriticas": True,
+        "subjuntivos": True,
     },
     "ortografia": {
         "diccionario": None,
@@ -91,6 +123,8 @@ DEFAULTS: dict[str, Any] = {
             "pq": "porque",
             "tmb": "también",
             "d": "de",
+            # «aun así» (= incluso así) nunca lleva tilde.
+            "aún así": "aun así",
         },
         "palabras_ignoradas": [],
     },
@@ -227,26 +261,27 @@ DEFAULTS: dict[str, Any] = {
         "minimo_palabras": 8,
         "similitud": 92,
         "maximo_parrafos": 2000,
+        "minimo_palabras_consecutivo": 4,
+        "minimo_palabras_oracion": 3,
+    },
+    "residuos_borrador": {
+        "patrones": [],
+        "vetados": [],
     },
     "residuo_ia": {
         "frases": [
             "en el vasto tapiz",
             "un testimonio de",
-            "no solo",
-            "en resumen",
             "es importante destacar",
             "en conclusión",
             "como si el tiempo se detuviera",
             "un torbellino de emociones",
             "en la encrucijada de",
             "una sinfonía de",
-            "el eco de",
             "una danza de",
-            "en el corazón de",
             "un recordatorio de que",
             "un viaje de autodescubrimiento",
             "con cada fibra de su ser",
-            "el peso de",
             "la esencia misma de",
         ]
     },
@@ -318,6 +353,20 @@ class Configuracion:
         except (TypeError, ValueError):
             umbral = 0.90
         return max(0.0, min(1.0, umbral))
+
+    def l2_seguras(self) -> dict[str, float]:
+        """Umbral por regla de las L2 que se pueden aplicar en bloque."""
+
+        crudo = self.obtener("l2_seguras", {}) or {}
+        if not isinstance(crudo, dict):
+            return {}
+        seguras: dict[str, float] = {}
+        for regla, umbral in crudo.items():
+            try:
+                seguras[str(regla).strip().upper()] = max(0.0, min(1.0, float(umbral)))
+            except (TypeError, ValueError):
+                continue
+        return seguras
 
     @property
     def comillas(self) -> str:

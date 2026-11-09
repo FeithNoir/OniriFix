@@ -13,6 +13,21 @@ idioma: es
 # Umbral mínimo de confianza para aplicar hallazgos L2.
 umbral_l2: 0.90
 
+# L2 «seguras»: reglas L2 cuya precisión se verificó en un manuscrito real.
+# `onirifix corregir --l2-seguras` y el botón «Aceptar L2 seguras» de la
+# interfaz las aplican cuando su confianza llega al umbral de cada una; el
+# resto de L2 queda pendiente de revisión.
+l2_seguras:
+  DIA-006: 0.92
+  DIA-007: 0.88
+  TIL-001: 0.88
+  TIL-003: 0.88
+  TIL-004: 0.92
+  TIL-005: 0.86
+  TIL-006: 0.9
+  ORT-001: 0.82
+  ORT-004: 0.86
+
 # Copia de seguridad antes de modificar un archivo y auditoría en SQLite.
 backup: true
 auditoria: true
@@ -41,7 +56,7 @@ reglas:
   TIP-009: true
   TIP-010: false
   DIA-001: true
-  DIA-002: true
+  DIA-002: false  # choca con DIA-007: «—dijo Ana—. El mar…» mantiene la mayúscula
   DIA-003: false
   DIA-004: true
   DIA-005: true
@@ -58,6 +73,20 @@ reglas:
   REP-002: true
   REP-003: true
   REP-004: true
+  TIP-011: true
+  TIP-012: true
+  TIP-013: true
+  TIP-014: false  # “…” puede marcar pensamientos; actívala si la obra no las usa
+  TIP-015: true
+  DIA-006: true
+  DIA-007: true
+  TIL-003: true
+  TIL-004: true
+  TIL-005: true
+  TIL-006: true
+  ORT-004: true
+  REP-005: true
+  REP-006: true
 
 # ---------------------------------------------------------------------------
 # Tipografía mecánica (L1)
@@ -95,6 +124,15 @@ tildes:
   permitir_voseo: false
   # Palabras terminadas en á que la regla debe ignorar siempre.
   palabras_validas_extra: []
+  # TIL-003/TIL-004: pretéritos sin tilde (miro → miró) y su espejo (un suspiró → un suspiro).
+  preteritos: true
+  # Pretérito de reír. La RAE (2010) escribe «rio» sin tilde; el informe editorial
+  # pide «rió». Con "rio", la regla deja de marcar «rio» y solo corrige «río».
+  forma_rio: rió
+  # TIL-005: Sé/Sí/él/qué en contextos inequívocos.
+  diacriticas: true
+  # TIL-006: futuro en lugar de subjuntivo («como si esperará» → «esperara»).
+  subjuntivos: true
 
 # ---------------------------------------------------------------------------
 # Ortografía
@@ -114,6 +152,8 @@ ortografia:
     "pq": "porque"
     "tmb": "también"
     "d": "de"
+    # «aun así» (= incluso así) nunca lleva tilde.
+    "aún así": "aun así"
   palabras_ignoradas: []
 
 # ---------------------------------------------------------------------------
@@ -263,6 +303,19 @@ duplicados:
   # Protección de rendimiento: a partir de este número de párrafos solo se
   # comparan bloques con una longitud parecida.
   maximo_parrafos: 2000
+  # REP-005: párrafos u oraciones idénticos seguidos (propone borrar la copia).
+  minimo_palabras_consecutivo: 4
+  minimo_palabras_oracion: 3
+
+# ---------------------------------------------------------------------------
+# Residuos de borrador y términos vetados (REP-006, solo informe)
+# ---------------------------------------------------------------------------
+residuos_borrador:
+  # Expresiones regulares extra (sin distinguir mayúsculas) que se suman a las
+  # internas: «Aquí tienes», «(Contexto anterior…)», «Escena ampliada», [TODO]…
+  patrones: []
+  # Anacronismos o préstamos que la obra no admite. Ejemplo: [jeans, cool]
+  vetados: []
 
 # ---------------------------------------------------------------------------
 # Residuo de IA (L3, solo informe)
@@ -271,19 +324,14 @@ residuo_ia:
   frases:
     - en el vasto tapiz
     - un testimonio de
-    - no solo
-    - en resumen
     - es importante destacar
     - en conclusión
     - como si el tiempo se detuviera
     - un torbellino de emociones
     - en la encrucijada de
     - una sinfonía de
-    - el eco de
     - una danza de
-    - en el corazón de
     - un recordatorio de que
     - un viaje de autodescubrimiento
     - con cada fibra de su ser
-    - el peso de
     - la esencia misma de

@@ -19,11 +19,13 @@ keywords = [
   "edición",
   "novela",
   "cli",
+  "gui",
   "sqlite",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
+  "Environment :: X11 Applications :: Qt",
   "Intended Audience :: Other Audience",
   "License :: OSI Approved :: MIT License",
   "Natural Language :: Spanish",
@@ -46,6 +48,8 @@ dependencies = [
 nlp = ["spacy>=3.7"]
 ortografia = ["spylls>=0.1.7"]
 docx = ["python-docx>=1.1"]
+pdf = ["pdfminer.six>=20231228", "reportlab>=4.0"]
+gui = ["PySide6>=6.6", "pdfminer.six>=20231228", "reportlab>=4.0"]
 dev = [
   "pytest>=8.2",
   "pytest-cov>=5.0",
@@ -57,21 +61,30 @@ dev = [
 build = [
   "pyinstaller>=6.0",
   "pillow>=10.4",
+  "PySide6>=6.6",
+  "pdfminer.six>=20231228",
+  "reportlab>=4.0",
 ]
 todo = [
   "spacy>=3.7",
   "spylls>=0.1.7",
   "python-docx>=1.1",
+  "PySide6>=6.6",
+  "pdfminer.six>=20231228",
+  "reportlab>=4.0",
 ]
 
 [project.scripts]
 onirifix = "onirifix.cli:cli"
 
+[project.gui-scripts]
+onirifix-gui = "onirifix.gui.app:main"
+
 [project.urls]
-Homepage = "https://github.com/onirifix/onirifix"
-Documentation = "https://github.com/onirifix/onirifix/tree/main/docs"
-Repository = "https://github.com/onirifix/onirifix"
-Issues = "https://github.com/onirifix/onirifix/issues"
+Homepage = "https://github.com/FeithNoir/OniriFix"
+Documentation = "https://github.com/FeithNoir/OniriFix/tree/main/docs"
+Repository = "https://github.com/FeithNoir/OniriFix"
+Issues = "https://github.com/FeithNoir/OniriFix/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/onirifix"]
@@ -83,6 +96,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
   "lento: pruebas que requieren dependencias opcionales o corpus grandes",
+  "gui: pruebas de la interfaz PySide6 (se omiten si no está instalada)",
 ]
 
 [tool.coverage.run]

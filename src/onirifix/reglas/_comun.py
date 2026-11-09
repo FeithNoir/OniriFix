@@ -43,18 +43,22 @@ def oracion_alrededor(
 ) -> tuple[str, int, int]:
     """Devuelve la oración que contiene ``[inicio:fin]`` y sus offsets."""
 
-    inicio_oracion = 0
+    # Las búsquedas se acotan a una ventana: en un libro entero, un signo que
+    # no aparece cerca obligaría a recorrer todo el texto en cada hallazgo.
+    desde = max(0, inicio - maximo * 4)
+    hasta = min(len(texto), fin + maximo * 4)
+    inicio_oracion = desde
     for terminal in TERMINALES_ORACION + "\n":
-        posicion = texto.rfind(terminal, 0, inicio)
+        posicion = texto.rfind(terminal, desde, inicio)
         if posicion > inicio_oracion:
             inicio_oracion = posicion + 1
     # No arrastrar espacios ni una raya de diálogo inicial.
     while inicio_oracion < inicio and texto[inicio_oracion] in " \t—":
         inicio_oracion += 1
 
-    fin_oracion = len(texto)
+    fin_oracion = hasta
     for terminal in TERMINALES_ORACION + "\n":
-        posicion = texto.find(terminal, fin)
+        posicion = texto.find(terminal, fin, hasta)
         if posicion != -1:
             fin_oracion = min(fin_oracion, posicion + 1)
 

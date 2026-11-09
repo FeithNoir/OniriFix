@@ -120,7 +120,7 @@ def test_escribir_todos_los_formatos(tmp_path: Path) -> None:
 
 
 def test_escribir_informes_sin_formatos_conocidos(tmp_path: Path) -> None:
-    assert escribir_informes(_resultado(tmp_path), tmp_path / "x", formatos="pdf") == {}
+    assert escribir_informes(_resultado(tmp_path), tmp_path / "x", formatos="odt") == {}
 
 
 def test_diff_solo_con_cambios(tmp_path: Path) -> None:

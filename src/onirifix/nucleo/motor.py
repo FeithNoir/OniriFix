@@ -7,7 +7,7 @@ hallazgos, elimina solapamientos y los ordena por posición.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from onirifix.config import Configuracion
 from onirifix.linguistica import AnalizadorLinguistico, CorrectorOrtografico
@@ -25,6 +25,10 @@ from onirifix.nucleo.registro_reglas import descubrir_reglas
 
 log = logging.getLogger(__name__)
 
+
+
+class AnalisisCancelado(Exception):
+    """La persona canceló el análisis desde la interfaz."""
 
 class Motor:
     def __init__(
@@ -63,7 +67,14 @@ class Motor:
         solo_reglas: Iterable[str] | None = None,
         incluir_l3: bool = True,
         obra: Obra | None = None,
+        progreso: Callable[[int, int, str], bool | None] | None = None,
     ) -> ResultadoAnalisis:
+        """Ejecuta las reglas activas sobre el documento.
+
+        ``progreso(hechas, total, regla)`` se llama antes de cada regla; si
+        devuelve ``False`` el análisis se detiene con ``AnalisisCancelado``.
+        """
+
         solo = {r.strip().upper() for r in solo_reglas} if solo_reglas else None
         if solo:
             desconocidas = solo - {regla.id for regla in self.reglas}
@@ -90,7 +101,10 @@ class Motor:
         descripciones: dict[str, str] = {}
         errores: list[str] = []
 
-        for regla in self.reglas_activas(solo):
+        activas = self.reglas_activas(solo)
+        for numero, regla in enumerate(activas):
+            if progreso is not None and progreso(numero, len(activas), regla.id) is False:
+                raise AnalisisCancelado("Análisis cancelado.")
             ejecutadas.append(regla.id)
             descripciones[regla.id] = regla.descripcion
             try:
@@ -104,6 +118,8 @@ class Motor:
                 log.debug("La regla %s falló", regla.id, exc_info=True)
                 errores.append(f"{regla.id}: {type(exc).__name__}: {exc}")
 
+        if progreso is not None:
+            progreso(len(activas), len(activas), "")
         hallazgos = self.deduplicar(hallazgos)
         return ResultadoAnalisis(
             documento=documento,

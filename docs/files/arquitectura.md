@@ -25,14 +25,14 @@ La especificación original que sirvió de punto de partida se conserva en
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Presentación        cli.py · informes/terminal.py            │
-│                     Click, Rich, preguntas interactivas      │
+│ Presentación        cli.py · informes/terminal.py · gui/     │
+│                     Click, Rich · PySide6 (opcional)         │
 └──────────────────────────────┬───────────────────────────────┘
                                │
 ┌──────────────────────────────▼───────────────────────────────┐
 │ Servicio            servicio.py                              │
 │                     abrir_contexto, analizar, corregir,      │
-│                     auditoría, selección de niveles          │
+│                     aplicar_seleccion, exportar_informes     │
 └───────┬──────────────────────┬──────────────────────┬────────┘
         │                      │                      │
 ┌───────▼────────┐   ┌─────────▼─────────┐   ┌────────▼───────┐
@@ -45,7 +45,8 @@ La especificación original que sirvió de punto de partida se conserva en
         │                      │
 ┌───────▼──────────────────────▼───────────────────────────────┐
 │ Reglas              reglas/tipografia.py · dialogos.py ·      │
-│                     tildes.py · homofonos.py · ortografia.py  │
+│                     tildes.py · preterito.py · diacriticas.py │
+│                     homofonos.py · ortografia.py ·            │
 │                     consistencia.py · repeticion.py           │
 └──────────────────────────────────────────────────────────────┘
 
@@ -57,12 +58,34 @@ La dependencia apunta hacia el dominio y el núcleo. Las reglas no conocen
 Click, SQLite ni la terminal. La CLI no contiene SQL ni lógica lingüística: solo
 resuelve opciones, abre un contexto de servicio y presenta resultados.
 
+## Interfaz de escritorio (`gui/`)
+
+La GUI es otra capa de presentación sobre el mismo servicio. No reimplementa
+reglas, selección ni escritura:
+
+| Módulo | Responsabilidad |
+| :--- | :--- |
+| `gui/revision.py` | `SesionRevision`: estado de cada hallazgo (pendiente, aceptado, rechazado, aviso), filtros y estadísticas. Sin Qt, probado con pytest. |
+| `gui/trabajadores.py` | `QThread` para analizar, aplicar y exportar. Cada uno abre su propio `abrir_contexto` (SQLite no cruza hilos). |
+| `gui/ventana.py` | Ventana principal: cabecera de estado, laterales plegables, tabla, inspector y capa de ocupado. |
+| `gui/componentes/` | Piezas reutilizables: capa de ocupado, sección plegable, panel de reglas, filtros, estadísticas, tabla e inspector. |
+| `gui/tema.py` | Paleta oscura y hoja de estilo compartidas con TagFlow. |
+| `gui/app.py` | `main()`: crea la `QApplication`, aplica el tema y abre la ventana. |
+
+Flujo: `TrabajadorAnalisis` → `servicio.analizar` → `SesionRevision` (L1
+aceptados, L2 pendientes, L3 solo aviso) → decisiones en la tabla →
+`TrabajadorAplicar` → `servicio.aplicar_seleccion` (copia de seguridad +
+auditoría, la misma ruta que `onirifix revisar`) → nuevo análisis del texto
+corregido. Mientras un trabajador corre, la capa de ocupado bloquea cualquier
+otra acción.
+
 ## Módulos
 
 | Ruta | Responsabilidad |
 | :--- | :--- |
 | `src/onirifix/cli.py` | Comandos, opciones globales, códigos de salida y presentación. |
-| `src/onirifix/servicio.py` | Orquesta configuración, registro, motor, E/S y auditoría. |
+| `src/onirifix/servicio.py` | Orquesta configuración, registro, motor, E/S y auditoría. `aplicar_seleccion` es la única vía de escritura. |
+| `src/onirifix/gui/` | Interfaz de escritorio PySide6 (extra `[gui]`). |
 | `src/onirifix/modelo.py` | Tipos inmutables del dominio: `Hallazgo`, `Parche`, `Documento`, `Glosario`, `Obra`… |
 | `src/onirifix/config.py` | Defaults, fusión del YAML, variables de entorno y `Settings`. |
 | `src/onirifix/nucleo/motor.py` | Activa reglas, captura errores, deduplica y ordena hallazgos. |
